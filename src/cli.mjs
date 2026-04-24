@@ -325,6 +325,7 @@ function moveQueue(db, rootId, contextId, delta) {
 function excludeSelected(db, rootId, contextId) {
   const item = selectedQueueItem(db, rootId, contextId);
   if (!item) return console.log('Queue is empty.');
+  if (item.type === 'flashcard') return console.log('Flash cards cannot be marked done. Review them instead.');
   item.excluded = true;
   item.excludedAt = nowIso();
   setCursor(db, rootId, contextId, 0, queueForContext(db, rootId, contextId).length);
@@ -418,6 +419,7 @@ function moveRootQueue(db, rootId, delta) {
 function excludeCurrentQueueItem(db, rootId, contextId) {
   const item = itemById(db, contextId);
   if (!item || item.type === 'root') return console.log('Current queue item cannot be marked done.');
+  if (item.type === 'flashcard') return console.log('Flash cards cannot be marked done. Review them instead.');
   const previousQueue = rootQueueFor(db, rootId);
   const previousIndex = Math.max(0, previousQueue.findIndex((candidate) => candidate.id === contextId));
   item.excluded = true;

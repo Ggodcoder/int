@@ -86,7 +86,7 @@ Queue
   que            enter or resume the current root queue flow
   ] / next       move to the next queue item
   [ / prev       move to the previous queue item
-  d              mark the selected/current queue item done
+  d              mark the selected/current non-flashcard item done
   pass / fail    review the selected flash card outside que/drill
   1-4            rate revealed flash cards in que
 

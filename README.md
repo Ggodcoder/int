@@ -103,9 +103,9 @@ d
 pass / fail
 ```
 
-`d` marks the selected/current item as done. Done items are removed from queue flow, but they remain visible in normal lists with muted text and `<done>`.
+`d` marks the selected/current non-flashcard item as done. Done items are removed from queue flow, but they remain visible in normal lists with muted text and `<done>`. Flash cards are reviewed with FSRS ratings instead of done.
 
-`d`는 선택된/current 항목을 done 처리합니다. done 항목은 queue 흐름에서는 제외되지만, 일반 list에는 톤 다운된 텍스트와 `<done>` 표시로 남습니다.
+`d`는 선택된/current 비 플래시카드 항목을 done 처리합니다. done 항목은 queue 흐름에서는 제외되지만, 일반 list에는 톤 다운된 텍스트와 `<done>` 표시로 남습니다. 플래시카드는 done이 아니라 FSRS 평가로 리뷰합니다.
 
 Flash cards appear before regular items when they are due.
 In queue review, cards are masked as `[...]`; press Space to reveal, then rate:
