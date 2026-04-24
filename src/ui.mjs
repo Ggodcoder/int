@@ -1,7 +1,11 @@
+import { createRequire } from 'node:module';
 import { ancestorsOf, itemById, sortedRoots, statsForRoot, titleOf, typeLabel } from './items.mjs';
 import { cursorFor, isDueFlashcard, listForContext, queueForContext } from './queue.mjs';
 import { activityStats, yearlyActivity } from './activity.mjs';
 
+const require = createRequire(import.meta.url);
+const { version: APP_VERSION } = require('../package.json');
+const DEVELOPER = 'Jay';
 const CYAN = '\x1b[36m';
 const YELLOW = '\x1b[33m';
 const RESET = '\x1b[0m';
@@ -185,6 +189,8 @@ export function printIntro(db, output = process.stdout) {
     '    ██║██║╚██╗██║   ██║   ',
     '    ██║██║ ╚████║   ██║   ',
     '    ╚═╝╚═╝  ╚═══╝   ╚═╝   ',
+    `    Version ${APP_VERSION}`,
+    `    Developer ${DEVELOPER}`,
     '    Type help for commands.'
   ];
   const heat = heatmapLines(db);
