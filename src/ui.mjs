@@ -251,7 +251,7 @@ export function printContext(db, contextId) {
     const stats = statsForRoot(db, context.id);
     console.log('');
     console.log(
-      `Branches ${stats.branches} (${stats.doneBranches}/${stats.branches}) | Notes ${stats.notes} (${stats.doneNotes}/${stats.notes}) | Flashcards ${stats.flashcards} (0/${stats.flashcards})`
+      `Branches ${stats.branches} (${stats.doneBranches}/${stats.branches}) | Notes ${stats.notes} (${stats.doneNotes}/${stats.notes}) | Flashcards ${stats.flashcards}`
     );
   }
 
