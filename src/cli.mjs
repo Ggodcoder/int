@@ -10,11 +10,15 @@ import {
   makeBasicCard,
   makeClozeCard,
   makeItems,
+  makePdfImport,
   makeRoots,
+  makeWebImport,
   maskText,
+  pdfDisplayName,
   sortedRoots,
   titleOf,
-  typeLabel
+  typeLabel,
+  webDisplayName
 } from './items.mjs';
 import { makeFsrsCard, applyReview, applyReviewGrade } from './review.mjs';
 import { cursorFor, listForContext, queueForContext, rootQueueFor, selectedQueueItem, sessionFor, setCursor } from './queue.mjs';
@@ -22,6 +26,10 @@ import { printContext, printFlashcard, printHelp, printQueueProgress, printRoots
 import { formatDayBoundary, normalizeDayBoundary, nowIso } from './time.mjs';
 import { runDrill } from './drill.mjs';
 import { recordActivity } from './activity.mjs';
+import { normalizeWebUrl, renderWebPageToPdf } from './webImport.mjs';
+import { openWithDefaultApp, targetForOpenableItem } from './openTarget.mjs';
+import { selectPdfFile } from './fileDialog.mjs';
+import { copyPdfIntoLibrary } from './pdfImport.mjs';
 
 const rl = createInterface({ input, output });
 const ROOT_QUEUE_CONTEXT = '__root_queue__';
@@ -125,6 +133,100 @@ async function createCloze(db, contextId) {
   db.items.push(makeClozeCard(context, clozeText, maskedText, makeFsrsCard()));
   saveDb(db);
   printResult('Created cloze flash card.');
+}
+
+async function importWeb(db, contextId) {
+  const context = itemById(db, contextId);
+  if (context?.type !== 'branch') {
+    printResult('Web imports can be attached inside a branch.');
+    return contextId;
+  }
+
+  const rawUrl = await askValue(rl, 'type>');
+  if (!rawUrl) return contextId;
+
+  let url;
+  try {
+    url = normalizeWebUrl(rawUrl);
+  } catch (error) {
+    printResult(error.message);
+    return contextId;
+  }
+
+  printResult('Importing web page as PDF...');
+  try {
+    const result = await renderWebPageToPdf({ url, filePrefix: rawUrl });
+    const item = makeWebImport(context, {
+      title: result.title,
+      sourceUrl: url,
+      pdfPath: result.pdfPath,
+      pdfFileName: result.pdfFileName,
+      pageSize: result.pageSize
+    });
+    db.items.push(item);
+    saveDb(db);
+    const name = webDisplayName(item);
+    printResult(`Imported web: ${name}\nPDF: ${name}`);
+    return contextId;
+  } catch (error) {
+    const item = makeWebImport(context, {
+      title: url,
+      sourceUrl: url,
+      pdfPath: null,
+      pdfFileName: null,
+      pageSize: null
+    });
+    item.captureError = error.message;
+    db.items.push(item);
+    saveDb(db);
+    printResult(`Saved web link only: ${webDisplayName(item)}\nPDF: not captured (${error.message})`);
+    return contextId;
+  }
+}
+
+async function importPdf(db, contextId) {
+  const context = itemById(db, contextId);
+  if (context?.type !== 'branch') {
+    printResult('PDF imports can be attached inside a branch.');
+    return contextId;
+  }
+
+  let selectedPath;
+  try {
+    selectedPath = selectPdfFile();
+  } catch (error) {
+    printResult(`PDF selection failed: ${error.message}`);
+    return contextId;
+  }
+
+  if (!selectedPath) {
+    printResult('Canceled.');
+    return contextId;
+  }
+
+  try {
+    const result = copyPdfIntoLibrary(selectedPath);
+    const item = makePdfImport(context, result);
+    db.items.push(item);
+    saveDb(db);
+    printResult(`Imported PDF: ${pdfDisplayName(item)}`);
+    return contextId;
+  } catch (error) {
+    printResult(`PDF import failed: ${error.message}`);
+    return contextId;
+  }
+}
+
+function openCurrent(db, contextId) {
+  const item = itemById(db, contextId);
+  const target = targetForOpenableItem(item);
+  if (!target) {
+    printResult('Nothing openable here.');
+    return;
+  }
+  openWithDefaultApp(target.target);
+  const name = item.type === 'pdf' ? pdfDisplayName(item) : webDisplayName(item);
+  printResult(`Opened ${target.kind}: ${name}`);
 }
 
 async function setLearningTime(db) {
@@ -570,6 +672,10 @@ async function run() {
       printContextWithGap(db, contextId);
       continue;
     }
+    if (normalized === 'open') {
+      openCurrent(db, contextId);
+      continue;
+    }
     if (normalized === 'home' || normalized === 'root') {
       contextId = rootId;
       inRootQueue = false;
@@ -601,6 +707,16 @@ async function run() {
     }
     if (normalized === 'new note' || normalized === 'n' || normalized === 'ㅜ') {
       contextId = await createItem(db, contextId, 'note');
+      printContextWithGap(loadDb(), contextId);
+      continue;
+    }
+    if (normalized === 'import web') {
+      contextId = await importWeb(db, contextId);
+      printContextWithGap(loadDb(), contextId);
+      continue;
+    }
+    if (normalized === 'import pdf') {
+      contextId = await importPdf(db, contextId);
       printContextWithGap(loadDb(), contextId);
       continue;
     }

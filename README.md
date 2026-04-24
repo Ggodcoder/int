@@ -52,6 +52,8 @@ set root
 new branch    b, ㅠ
 new leaf      l, ㅣ
 new note      n, ㅜ
+import web
+import pdf
 basic
 cloze
 ```
@@ -68,6 +70,35 @@ Press `Esc` during follow-up prompts to cancel.
 
 후속 프롬프트에서는 `Esc`로 취소할 수 있습니다.
 
+## Web Import / 웹 가져오기
+
+Use `import web` inside a branch to save a URL as a PDF-backed web item.
+
+branch 안에서 `import web`을 입력하면 URL을 PDF로 저장한 web 항목을 만들 수 있습니다.
+
+```text
+import web
+type> https://example.com
+```
+
+The generated PDFs are stored under the app data imports folder.
+
+생성된 PDF는 앱 데이터의 imports 폴더 아래에 저장됩니다.
+
+## PDF Import / PDF 가져오기
+
+Use `import pdf` inside a branch to open a file picker and save the selected PDF as a PDF item.
+
+branch 안에서 `import pdf`를 입력하면 파일 선택창이 열리고, 선택한 PDF를 PDF 항목으로 저장합니다.
+
+```text
+import pdf
+```
+
+Imported PDFs are copied into the app data imports folder and can be opened with `open`.
+
+가져온 PDF는 앱 데이터의 imports 폴더로 복사되며 `open`으로 열 수 있습니다.
+
 ## Navigate / 이동
 
 Type a listed number or exact item title to enter it.
@@ -77,6 +108,7 @@ Type a listed number or exact item title to enter it.
 ```text
 root / home    return to the current root
 back           move to the parent item
+open           open the current PDF/web item with the default app
 where          show the current context
 clear          clear screen and show the start view
 help           show help

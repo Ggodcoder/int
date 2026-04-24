@@ -6,7 +6,19 @@ export function titleOf(item) {
     if (item.cardType === 'basic') return item.question;
     return item.maskedText;
   }
+  if (item.type === 'web') return item.title ?? item.sourceUrl;
+  if (item.type === 'pdf') return item.title ?? item.pdfFileName ?? item.pdfPath;
   return item.title;
+}
+
+export function webDisplayName(item) {
+  if (!item || item.type !== 'web') return '';
+  return item.title || item.sourceUrl || item.pdfFileName || 'web import';
+}
+
+export function pdfDisplayName(item) {
+  if (!item || item.type !== 'pdf') return '';
+  return item.title || item.pdfFileName || item.pdfPath || 'pdf import';
 }
 
 export function typeLabel(item) {
@@ -173,6 +185,35 @@ export function makeClozeCard(context, clozeText, maskedText, fsrsCard) {
   };
   card.due = card.fsrsCard.due;
   return card;
+}
+
+export function makeWebImport(context, { title, sourceUrl, pdfPath, pdfFileName, pageSize }) {
+  return {
+    id: id('web'),
+    type: 'web',
+    title: title || sourceUrl,
+    sourceUrl,
+    pdfPath,
+    pdfFileName,
+    pageSize,
+    ...parentForNewItem(context),
+    createdAt: nowIso(),
+    excluded: false
+  };
+}
+
+export function makePdfImport(context, { title, sourcePath, pdfPath, pdfFileName }) {
+  return {
+    id: id('pdf'),
+    type: 'pdf',
+    title: title || pdfFileName || sourcePath,
+    sourcePath,
+    pdfPath,
+    pdfFileName,
+    ...parentForNewItem(context),
+    createdAt: nowIso(),
+    excluded: false
+  };
 }
 
 export function maskText(body, cloze) {

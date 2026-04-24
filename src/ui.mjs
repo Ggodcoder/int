@@ -1,5 +1,5 @@
 import { createRequire } from 'node:module';
-import { ancestorsOf, itemById, sortedRoots, statsForRoot, titleOf, typeLabel } from './items.mjs';
+import { ancestorsOf, itemById, pdfDisplayName, sortedRoots, statsForRoot, titleOf, typeLabel, webDisplayName } from './items.mjs';
 import { cursorFor, isDueFlashcard, listForContext, queueForContext } from './queue.mjs';
 import { activityStats, yearlyActivity } from './activity.mjs';
 
@@ -83,6 +83,8 @@ Create
   new branch     create branches under any knowledge item (b, ㅠ)
   new leaf       create leaves under any knowledge item (l, ㅣ)
   new note       create notes under any knowledge item (n, ㅜ)
+  import web     import a URL as a PDF under the current branch
+  import pdf     import a PDF file under the current branch
   basic          create a basic flash card under the current note
   cloze          create a cloze flash card from the current note body
 
@@ -112,6 +114,7 @@ Sort
 Navigation
   root / home    return to the current root
   back           move to the parent item
+  open           open the current PDF/web item with the default app
   where          show the current context
   clear          clear screen and show the start view
 
@@ -123,6 +126,7 @@ Settings
 
 Licenses
   int-cli        personal/local project
+  playwright 1.59.1 Apache-2.0 License
   ts-fsrs 5.3.2 MIT License
 `.trim());
 }
@@ -265,6 +269,23 @@ export function printContext(db, contextId) {
   }
 
   if (context.type === 'flashcard') {
+    return;
+  }
+
+  if (context.type === 'web') {
+    const name = webDisplayName(context);
+    console.log('');
+    if (context.pdfPath) {
+      console.log(`PDF: ${name}`);
+    } else {
+      console.log(`URL: ${name}`);
+    }
+    return;
+  }
+
+  if (context.type === 'pdf') {
+    console.log('');
+    console.log(`PDF: ${pdfDisplayName(context)}`);
     return;
   }
 
