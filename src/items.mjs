@@ -107,9 +107,9 @@ export function statsForRoot(db, rootId) {
 }
 
 export function canCreate(context, type) {
-  if (type === 'branch') return context.type === 'root' || context.type === 'branch';
-  if (type === 'leaf') return context.type === 'branch' || context.type === 'leaf';
-  if (type === 'note') return context.type === 'leaf' || context.type === 'note';
+  if (type === 'branch' || type === 'leaf' || type === 'note') {
+    return context.type === 'root' || context.type === 'branch' || context.type === 'leaf' || context.type === 'note';
+  }
   if (type === 'flashcard') return context.type === 'note';
   return false;
 }

@@ -76,9 +76,9 @@ Commands
   number/title   enter a listed root or child item
 
 Create
-  new branch     create branches under the current root/branch (b, ㅠ)
-  new leaf       create leaves under the current branch/leaf (l, ㅣ)
-  new note       create notes under the current leaf/note (n, ㅜ)
+  new branch     create branches under any knowledge item (b, ㅠ)
+  new leaf       create leaves under any knowledge item (l, ㅣ)
+  new note       create notes under any knowledge item (n, ㅜ)
   basic          create a basic flash card under the current note
   cloze          create a cloze flash card from the current note body
 

@@ -58,9 +58,11 @@ cloze
 
 `basic` creates a flash card with `Q?` and `A?`.
 `cloze` creates a masked flash card from the current note text.
+Branches, leaves, and notes can be created under any knowledge item. Flash cards can only be created under notes.
 
 `basic`은 `Q?`, `A?` 입력으로 플래시카드를 만듭니다.
 `cloze`는 현재 note 본문에서 특정 텍스트를 마스킹한 플래시카드를 만듭니다.
+branch, leaf, note는 어떤 지식 항목 아래에서도 만들 수 있습니다. flash card는 note 아래에서만 만들 수 있습니다.
 
 Press `Esc` during follow-up prompts to cancel.
 
