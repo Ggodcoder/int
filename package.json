@@ -1,0 +1,27 @@
+{
+  "name": "int-cli",
+  "version": "0.1.0",
+  "description": "A forest-to-leaf knowledge CLI with FSRS flashcards.",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Ggodcoder/int.git"
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "bin": {
+    "int": "./src/cli.mjs"
+  },
+  "scripts": {
+    "start": "node ./src/cli.mjs",
+    "smoke": "node ./src/cli.mjs --smoke"
+  },
+  "dependencies": {
+    "ts-fsrs": "^5.3.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
