@@ -62,10 +62,14 @@ export function rootQueueFor(db, rootId) {
   return [...due.sort(queueSort(boundary)), ...regular];
 }
 
-export function queueForContext(db, rootId, contextId) {
+export function listForContext(db, rootId, contextId) {
   const context = itemById(db, contextId);
   if (!context || !belongsToRoot(context, rootId)) return [];
   return childrenOf(db, rootId, contextId);
+}
+
+export function queueForContext(db, rootId, contextId) {
+  return listForContext(db, rootId, contextId).filter((item) => !item.excluded);
 }
 
 export function sessionFor(db, rootId) {

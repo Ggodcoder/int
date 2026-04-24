@@ -17,7 +17,7 @@ import {
   typeLabel
 } from './items.mjs';
 import { makeFsrsCard, applyReview, applyReviewGrade } from './review.mjs';
-import { cursorFor, queueForContext, rootQueueFor, selectedQueueItem, setCursor } from './queue.mjs';
+import { cursorFor, listForContext, queueForContext, rootQueueFor, selectedQueueItem, setCursor } from './queue.mjs';
 import { printContext, printFlashcard, printHelp, printRoots, printStartView, printStudyFlashcard } from './ui.mjs';
 import { formatDayBoundary, normalizeDayBoundary, nowIso } from './time.mjs';
 import { runDrill } from './drill.mjs';
@@ -118,7 +118,7 @@ async function setLearningTime(db) {
 }
 
 function findInQueue(db, rootId, contextId, token) {
-  const queue = queueForContext(db, rootId, contextId);
+  const queue = listForContext(db, rootId, contextId);
   const asNumber = Number.parseInt(token, 10);
   if (Number.isInteger(asNumber) && queue[asNumber - 1]) return queue[asNumber - 1];
   return queue.find((item) => titleOf(item).toLowerCase() === token.toLowerCase());
@@ -170,7 +170,7 @@ function removeDeletedIdsFromSessions(db, deletedIds) {
 }
 
 function deleteFromQueue(db, rootId, contextId, spec) {
-  const queue = queueForContext(db, rootId, contextId);
+  const queue = listForContext(db, rootId, contextId);
   if (queue.length === 0) return console.log('Queue is empty.');
 
   const { indices, invalid } = parseDeleteSpec(spec, queue.length);
@@ -299,7 +299,7 @@ function sortRootList(db, command) {
 function sortContextList(db, rootId, contextId, command) {
   const spec = parseSortSpec(command);
   if (!spec) return false;
-  const list = queueForContext(db, rootId, contextId);
+  const list = listForContext(db, rootId, contextId);
   const result = moveListItem(list, spec.source, spec.destination);
   if (!result.ok) {
     console.log(result.message);
@@ -329,7 +329,7 @@ function excludeSelected(db, rootId, contextId) {
   item.excludedAt = nowIso();
   setCursor(db, rootId, contextId, 0, queueForContext(db, rootId, contextId).length);
   saveDb(db);
-  console.log(`Excluded forever: [${typeLabel(item)}] ${titleOf(item)}`);
+  console.log(`Done: [${typeLabel(item)}] ${titleOf(item)}`);
 }
 
 function reviewSelected(db, rootId, contextId, passed) {
@@ -417,7 +417,7 @@ function moveRootQueue(db, rootId, delta) {
 
 function excludeCurrentQueueItem(db, rootId, contextId) {
   const item = itemById(db, contextId);
-  if (!item || item.type === 'root') return console.log('Current queue item cannot be excluded.');
+  if (!item || item.type === 'root') return console.log('Current queue item cannot be marked done.');
   const previousQueue = rootQueueFor(db, rootId);
   const previousIndex = Math.max(0, previousQueue.findIndex((candidate) => candidate.id === contextId));
   item.excluded = true;
@@ -425,7 +425,7 @@ function excludeCurrentQueueItem(db, rootId, contextId) {
   const nextQueue = rootQueueFor(db, rootId);
   setCursor(db, rootId, ROOT_QUEUE_CONTEXT, previousIndex, nextQueue.length);
   saveDb(db);
-  console.log(`Excluded forever: [${typeLabel(item)}] ${titleOf(item)}`);
+  console.log(`Done: [${typeLabel(item)}] ${titleOf(item)}`);
   return nextQueue[cursorFor(db, rootId, ROOT_QUEUE_CONTEXT, nextQueue.length)]?.id ?? null;
 }
 

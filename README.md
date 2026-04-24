@@ -103,6 +103,10 @@ d
 pass / fail
 ```
 
+`d` marks the selected/current item as done. Done items are removed from queue flow, but they remain visible in normal lists with muted text and `<done>`.
+
+`d`는 선택된/current 항목을 done 처리합니다. done 항목은 queue 흐름에서는 제외되지만, 일반 list에는 톤 다운된 텍스트와 `<done>` 표시로 남습니다.
+
 Flash cards appear before regular items when they are due.
 In queue review, cards are masked as `[...]`; press Space to reveal, then rate:
 

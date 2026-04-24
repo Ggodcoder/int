@@ -1,11 +1,12 @@
 import { ancestorsOf, itemById, sortedRoots, statsForRoot, titleOf, typeLabel } from './items.mjs';
-import { cursorFor, isDueFlashcard, queueForContext } from './queue.mjs';
+import { cursorFor, isDueFlashcard, listForContext, queueForContext } from './queue.mjs';
 import { activityStats, yearlyActivity } from './activity.mjs';
 
 const CYAN = '\x1b[36m';
 const YELLOW = '\x1b[33m';
 const RESET = '\x1b[0m';
 const PROMPT_BG = '\x1b[48;5;236m';
+const MUTED = '\x1b[90m';
 
 function truncate(value, length) {
   return value.length > length ? `${value.slice(0, length - 1)}…` : value;
@@ -64,7 +65,7 @@ export function flashcardLine(item, { revealed = true, baseColor = '' } = {}) {
 
 function listCountFor(db, item) {
   const rootId = item.type === 'root' ? item.id : item.rootId;
-  return queueForContext(db, rootId, item.id).length;
+  return listForContext(db, rootId, item.id).length;
 }
 
 export function printHelp() {
@@ -85,7 +86,7 @@ Queue
   que            enter or resume the current root queue flow
   ] / next       move to the next queue item
   [ / prev       move to the previous queue item
-  d              exclude the selected/current queue item forever
+  d              mark the selected/current queue item done
   pass / fail    review the selected flash card outside que/drill
   1-4            rate revealed flash cards in que
 
@@ -241,6 +242,7 @@ export function printContext(db, contextId) {
     return;
   }
   const rootId = context.type === 'root' ? context.id : context.rootId;
+  const list = listForContext(db, rootId, contextId);
   const queue = queueForContext(db, rootId, contextId);
   cursorFor(db, rootId, contextId, queue.length);
 
@@ -257,15 +259,17 @@ export function printContext(db, contextId) {
 
   console.log('');
 
-  if (queue.length === 0) {
+  if (list.length === 0) {
     console.log('  empty');
     return;
   }
 
-  queue.forEach((item, index) => {
-    const duePrefix = isDueFlashcard(item, db.app.dayBoundary) ? '*' : ' ';
+  list.forEach((item, index) => {
+    const duePrefix = !item.excluded && isDueFlashcard(item, db.app.dayBoundary) ? '*' : ' ';
     const title = item.type === 'flashcard' ? flashcardLine(item, { revealed: true }) : titleOf(item);
-    console.log(`  ${index + 1}. ${duePrefix}[${typeLabel(item)}] ${title} (${listCountFor(db, item)})`);
+    const suffix = item.excluded ? ' <done>' : '';
+    const line = `  ${index + 1}. ${duePrefix}[${typeLabel(item)}] ${title} (${listCountFor(db, item)})${suffix}`;
+    console.log(item.excluded ? `${MUTED}${line}${RESET}` : line);
   });
 }
 

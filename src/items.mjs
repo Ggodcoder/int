@@ -54,12 +54,12 @@ export function ancestorsOf(db, itemId) {
 
 export function childrenOf(db, rootId, parentId) {
   return db.items
-    .filter((item) => item.rootId === rootId && item.parentId === parentId && !item.excluded)
+    .filter((item) => item.rootId === rootId && item.parentId === parentId)
     .sort(listSort);
 }
 
 export function descendantsOf(db, rootId, parentId = rootId) {
-  const direct = db.items.filter((item) => item.rootId === rootId && item.parentId === parentId && !item.excluded);
+  const direct = db.items.filter((item) => item.rootId === rootId && item.parentId === parentId);
   return direct.flatMap((item) => [item, ...descendantsOf(db, rootId, item.id)]);
 }
 
@@ -94,7 +94,7 @@ export function flashcardsOfRoot(db, rootId, includeExcluded = false) {
 export function statsForRoot(db, rootId) {
   return db.items.reduce(
     (stats, item) => {
-      if (item.rootId !== rootId || item.excluded) return stats;
+      if (item.rootId !== rootId) return stats;
       if (item.type === 'branch') stats.branches += 1;
       if (item.type === 'note') stats.notes += 1;
       if (item.type === 'flashcard') stats.flashcards += 1;
