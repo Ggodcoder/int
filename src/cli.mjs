@@ -17,7 +17,7 @@ import {
   typeLabel
 } from './items.mjs';
 import { makeFsrsCard, applyReview, applyReviewGrade } from './review.mjs';
-import { cursorFor, listForContext, queueForContext, rootQueueFor, selectedQueueItem, setCursor } from './queue.mjs';
+import { cursorFor, listForContext, queueForContext, rootQueueFor, selectedQueueItem, sessionFor, setCursor } from './queue.mjs';
 import { printContext, printFlashcard, printHelp, printRoots, printStartView, printStudyFlashcard } from './ui.mjs';
 import { formatDayBoundary, normalizeDayBoundary, nowIso } from './time.mjs';
 import { runDrill } from './drill.mjs';
@@ -369,7 +369,10 @@ function enterRootQueue(db, rootId, contextId, { resume = false } = {}) {
     console.log('Root queue is empty.');
     return { contextId, entered: false };
   }
-  const index = resume ? cursorFor(db, rootId, ROOT_QUEUE_CONTEXT, queue.length) : 0;
+  const session = sessionFor(db, rootId);
+  const shouldResume = resume || session.rootQueueStarted === true;
+  const index = shouldResume ? cursorFor(db, rootId, ROOT_QUEUE_CONTEXT, queue.length) : 0;
+  session.rootQueueStarted = true;
   setCursor(db, rootId, ROOT_QUEUE_CONTEXT, index, queue.length);
   saveDb(db);
   return { contextId: queue[index].id, entered: true };
