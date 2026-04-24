@@ -228,3 +228,23 @@
 - `npm pack --dry-run` includes README, package metadata, and source modules only.
 - Targeted checks passed for URL normalization, PDF copy, open target selection, platform opener commands, and macOS cancel classification.
 - Real `https://example.com/` web render produced `Example Domain` as an 18 KB PDF.
+
+# Third-Party Notices And Help Audit
+
+- [x] Plan: move third-party license details into a dedicated notice file and compare help against implemented commands.
+- [x] Implement: add `THIRD_PARTY_NOTICES.md`, include it in npm files, link it from README, and update help aliases/details.
+- [x] Verify: run syntax checks, smoke test, help output check, and package dry run.
+- [x] Review: commit and push the verified changes.
+
+## Review
+
+- Added `THIRD_PARTY_NOTICES.md` with Playwright and ts-fsrs notices.
+- Added `THIRD_PARTY_NOTICES.md` to `package.json` files so npm installs include it.
+- Help output now mentions the `previous` alias, expanded multi-delete syntax, and the notice file.
+- README license section now points to `THIRD_PARTY_NOTICES.md`.
+- Verification passed:
+  - `node --check src\ui.mjs`
+  - `node --check src\cli.mjs`
+  - `npm run smoke`
+  - help output grep for notice and alias lines
+  - `npm pack --dry-run` includes `THIRD_PARTY_NOTICES.md`

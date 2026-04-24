@@ -251,7 +251,6 @@ Set `INT_DB_FILE` to use a custom database path.
 
 ## License Notices / 라이선스 표기
 
-```text
-int-cli        personal/local project
-ts-fsrs 5.3.2 MIT License
-```
+Third-party notices are listed in `THIRD_PARTY_NOTICES.md`.
+
+서드파티 라이선스 표기는 `THIRD_PARTY_NOTICES.md`에 정리되어 있습니다.

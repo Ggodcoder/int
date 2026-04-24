@@ -91,7 +91,7 @@ Create
 Queue
   que            enter or resume the current root queue flow
   ] / next       move to the next queue item
-  [ / prev       move to the previous queue item
+  [ / prev       move to the previous queue item (previous also works)
   d              mark the selected/current non-flashcard item done
   pass / fail    review the selected flash card outside que/drill
   1-4            rate revealed flash cards in que
@@ -103,7 +103,7 @@ Drill
 Delete
   del n          delete one listed item
   del n:m        delete a range of listed items
-  del n // m     delete several listed items
+  del n // m     delete several listed items (del n // m // ...)
   del on home    delete roots from the root list
 
 Sort
@@ -128,6 +128,7 @@ Licenses
   int-cli        personal/local project
   playwright 1.59.1 Apache-2.0 License
   ts-fsrs 5.3.2 MIT License
+  see THIRD_PARTY_NOTICES.md for full notices
 `.trim());
 }
 
