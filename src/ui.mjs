@@ -250,7 +250,9 @@ export function printContext(db, contextId) {
   if (context.type === 'root') {
     const stats = statsForRoot(db, context.id);
     console.log('');
-    console.log(`Branches ${stats.branches} | Notes ${stats.notes} | Flashcards ${stats.flashcards}`);
+    console.log(
+      `Branches ${stats.branches} (${stats.doneBranches}/${stats.branches}) | Notes ${stats.notes} (${stats.doneNotes}/${stats.notes}) | Flashcards ${stats.flashcards} (0/${stats.flashcards})`
+    );
   }
 
   if (context.type === 'flashcard') {
@@ -271,6 +273,11 @@ export function printContext(db, contextId) {
     const line = `  ${index + 1}. ${duePrefix}[${typeLabel(item)}] ${title} (${listCountFor(db, item)})${suffix}`;
     console.log(item.excluded ? `${MUTED}${line}${RESET}` : line);
   });
+}
+
+export function printQueueProgress(current, total) {
+  console.log('');
+  console.log(`${current}/${total}`);
 }
 
 export function pathPrompt(db, contextId) {

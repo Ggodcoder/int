@@ -98,9 +98,11 @@ export function statsForRoot(db, rootId) {
       if (item.type === 'branch') stats.branches += 1;
       if (item.type === 'note') stats.notes += 1;
       if (item.type === 'flashcard') stats.flashcards += 1;
+      if (item.excluded && item.type === 'branch') stats.doneBranches += 1;
+      if (item.excluded && item.type === 'note') stats.doneNotes += 1;
       return stats;
     },
-    { branches: 0, notes: 0, flashcards: 0 }
+    { branches: 0, notes: 0, flashcards: 0, doneBranches: 0, doneNotes: 0 }
   );
 }
 

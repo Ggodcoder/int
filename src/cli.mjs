@@ -18,7 +18,7 @@ import {
 } from './items.mjs';
 import { makeFsrsCard, applyReview, applyReviewGrade } from './review.mjs';
 import { cursorFor, listForContext, queueForContext, rootQueueFor, selectedQueueItem, sessionFor, setCursor } from './queue.mjs';
-import { printContext, printFlashcard, printHelp, printRoots, printStartView, printStudyFlashcard } from './ui.mjs';
+import { printContext, printFlashcard, printHelp, printQueueProgress, printRoots, printStartView, printStudyFlashcard } from './ui.mjs';
 import { formatDayBoundary, normalizeDayBoundary, nowIso } from './time.mjs';
 import { runDrill } from './drill.mjs';
 import { recordActivity } from './activity.mjs';
@@ -381,13 +381,14 @@ function enterRootQueue(db, rootId, contextId, { resume = false } = {}) {
 async function showRootQueueItem(db, rootId, contextId) {
   const item = itemById(db, contextId);
   if (!item) return contextId;
+  const queue = rootQueueFor(db, rootId);
+  const currentIndex = Math.max(0, queue.findIndex((candidate) => candidate.id === contextId));
+  printQueueProgress(currentIndex + 1, queue.length);
   if (item.type !== 'flashcard') {
     printContext(db, contextId);
     return contextId;
   }
 
-  const queue = rootQueueFor(db, rootId);
-  const currentIndex = Math.max(0, queue.findIndex((candidate) => candidate.id === contextId));
   const grade = await studyFlashcard(db, item, { applySchedule: true });
   if (!grade) return contextId;
   saveDb(db);
