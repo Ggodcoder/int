@@ -26,6 +26,21 @@ import { recordActivity } from './activity.mjs';
 const rl = createInterface({ input, output });
 const ROOT_QUEUE_CONTEXT = '__root_queue__';
 
+function printResult(message) {
+  console.log('');
+  console.log(message);
+}
+
+function printContextWithGap(db, contextId) {
+  console.log('');
+  printContext(db, contextId);
+}
+
+function printRootsWithGap(db) {
+  console.log('');
+  printRoots(db);
+}
+
 function pluralType(type) {
   if (type === 'branch') return 'branches';
   if (type === 'leaf') return 'leaves';
@@ -35,14 +50,14 @@ function pluralType(type) {
 async function newRoot(db) {
   const titles = await askTypeEntries(rl);
   if (titles.length === 0) {
-    console.log('Canceled.');
+    printResult('Canceled.');
     return null;
   }
   const roots = makeRoots(titles);
   db.roots.push(...roots);
   db.app.activeRootId = roots[0].id;
   saveDb(db);
-  console.log(roots.length === 1 ? `Created root: ${roots[0].title}` : `Created ${roots.length} roots.`);
+  printResult(roots.length === 1 ? `Created root: ${roots[0].title}` : `Created ${roots.length} roots.`);
   return roots[0].id;
 }
 
@@ -57,7 +72,7 @@ async function setRoot(db) {
     ? roots[byNumber - 1]
     : db.roots.find((candidate) => candidate.title.toLowerCase() === choice.toLowerCase());
   if (!root) {
-    console.log('Root not found.');
+    printResult('Root not found.');
     return null;
   }
   db.app.activeRootId = root.id;
@@ -68,7 +83,7 @@ async function setRoot(db) {
 async function createItem(db, contextId, type) {
   const context = itemById(db, contextId);
   if (!canCreate(context, type)) {
-    console.log(`Cannot create ${type} here.`);
+    printResult(`Cannot create ${type} here.`);
     return contextId;
   }
   const titles = await askTypeEntries(rl);
@@ -76,45 +91,45 @@ async function createItem(db, contextId, type) {
   const items = makeItems(context, type, titles);
   db.items.push(...items);
   saveDb(db);
-  console.log(items.length === 1 ? `Created ${type}: ${items[0].title}` : `Created ${items.length} ${pluralType(type)}.`);
+  printResult(items.length === 1 ? `Created ${type}: ${items[0].title}` : `Created ${items.length} ${pluralType(type)}.`);
   return contextId;
 }
 
 async function createBasic(db, contextId) {
   const context = itemById(db, contextId);
-  if (!canCreate(context, 'flashcard')) return console.log('Basic cards can be created inside a note.');
+  if (!canCreate(context, 'flashcard')) return printResult('Basic cards can be created inside a note.');
   const question = await askValue(rl, 'Q?');
   if (!question) return;
   const answer = await askValue(rl, 'A?');
   if (!answer) return;
   db.items.push(makeBasicCard(context, question, answer, makeFsrsCard()));
   saveDb(db);
-  console.log('Created basic flash card.');
+  printResult('Created basic flash card.');
 }
 
 async function createCloze(db, contextId) {
   const context = itemById(db, contextId);
-  if (!canCreate(context, 'flashcard')) return console.log('Cloze cards can be created inside a note.');
+  if (!canCreate(context, 'flashcard')) return printResult('Cloze cards can be created inside a note.');
   const clozeText = await askValue(rl, 'clozing?');
   if (!clozeText) return;
   const noteBody = context.body ?? context.title;
   const maskedText = maskText(noteBody, clozeText);
-  if (maskedText === noteBody) console.log('Text was not found; saving the original note body as the prompt.');
+  if (maskedText === noteBody) printResult('Text was not found; saving the original note body as the prompt.');
   db.items.push(makeClozeCard(context, clozeText, maskedText, makeFsrsCard()));
   saveDb(db);
-  console.log('Created cloze flash card.');
+  printResult('Created cloze flash card.');
 }
 
 async function setLearningTime(db) {
   const value = await askValue(rl, 'type>');
   const boundary = normalizeDayBoundary(value);
   if (!boundary) {
-    console.log('Invalid time. Use 0000-2359.');
+    printResult('Invalid time. Use 0000-2359.');
     return;
   }
   db.app.dayBoundary = boundary;
   saveDb(db);
-  console.log(`Learning day starts at ${formatDayBoundary(boundary)}.`);
+  printResult(`Learning day starts at ${formatDayBoundary(boundary)}.`);
 }
 
 function findInQueue(db, rootId, contextId, token) {
@@ -171,11 +186,11 @@ function removeDeletedIdsFromSessions(db, deletedIds) {
 
 function deleteFromQueue(db, rootId, contextId, spec) {
   const queue = listForContext(db, rootId, contextId);
-  if (queue.length === 0) return console.log('Queue is empty.');
+  if (queue.length === 0) return printResult('Queue is empty.');
 
   const { indices, invalid } = parseDeleteSpec(spec, queue.length);
   if (indices.length === 0) {
-    console.log(invalid.length > 0 ? `Nothing deleted. Invalid index: ${invalid.join(', ')}` : 'Nothing deleted.');
+    printResult(invalid.length > 0 ? `Nothing deleted. Invalid index: ${invalid.join(', ')}` : 'Nothing deleted.');
     return;
   }
 
@@ -188,17 +203,17 @@ function deleteFromQueue(db, rootId, contextId, spec) {
 
   const selectedText = indices.length === 1 ? '1 selected item' : `${indices.length} selected items`;
   const totalText = deletedIds.size === indices.length ? '' : ` (${deletedIds.size} total with children)`;
-  console.log(`Deleted ${selectedText}${totalText}.`);
-  if (invalid.length > 0) console.log(`Skipped invalid index: ${invalid.join(', ')}`);
+  printResult(`Deleted ${selectedText}${totalText}.`);
+  if (invalid.length > 0) printResult(`Skipped invalid index: ${invalid.join(', ')}`);
 }
 
 function deleteFromRootList(db, spec) {
-  if (db.roots.length === 0) return console.log('Root list is empty.');
+  if (db.roots.length === 0) return printResult('Root list is empty.');
 
   const roots = sortedRoots(db);
   const { indices, invalid } = parseDeleteSpec(spec, roots.length);
   if (indices.length === 0) {
-    console.log(invalid.length > 0 ? `Nothing deleted. Invalid index: ${invalid.join(', ')}` : 'Nothing deleted.');
+    printResult(invalid.length > 0 ? `Nothing deleted. Invalid index: ${invalid.join(', ')}` : 'Nothing deleted.');
     return;
   }
 
@@ -217,8 +232,8 @@ function deleteFromRootList(db, spec) {
 
   const selectedText = indices.length === 1 ? '1 selected root' : `${indices.length} selected roots`;
   const totalText = childCount > 0 ? ` (${childCount + indices.length} total with children)` : '';
-  console.log(`Deleted ${selectedText}${totalText}.`);
-  if (invalid.length > 0) console.log(`Skipped invalid index: ${invalid.join(', ')}`);
+  printResult(`Deleted ${selectedText}${totalText}.`);
+  if (invalid.length > 0) printResult(`Skipped invalid index: ${invalid.join(', ')}`);
 }
 
 function parseSortSpec(command) {
@@ -288,11 +303,11 @@ function sortRootList(db, command) {
   const roots = sortedRoots(db);
   const result = moveListItem(roots, spec.source, spec.destination);
   if (!result.ok) {
-    console.log(result.message);
+    printResult(result.message);
     return true;
   }
   saveDb(db);
-  console.log('Sorted.');
+  printResult('Sorted.');
   return true;
 }
 
@@ -302,12 +317,12 @@ function sortContextList(db, rootId, contextId, command) {
   const list = listForContext(db, rootId, contextId);
   const result = moveListItem(list, spec.source, spec.destination);
   if (!result.ok) {
-    console.log(result.message);
+    printResult(result.message);
     return true;
   }
   setCursor(db, rootId, contextId, 0, list.length);
   saveDb(db);
-  console.log('Sorted.');
+  printResult('Sorted.');
   return true;
 }
 
@@ -324,31 +339,31 @@ function moveQueue(db, rootId, contextId, delta) {
 
 function excludeSelected(db, rootId, contextId) {
   const item = selectedQueueItem(db, rootId, contextId);
-  if (!item) return console.log('Queue is empty.');
-  if (item.type === 'flashcard') return console.log('Flash cards cannot be marked done. Review them instead.');
+  if (!item) return printResult('Queue is empty.');
+  if (item.type === 'flashcard') return printResult('Flash cards cannot be marked done. Review them instead.');
   item.excluded = true;
   item.excludedAt = nowIso();
   setCursor(db, rootId, contextId, 0, queueForContext(db, rootId, contextId).length);
   saveDb(db);
-  console.log(`Done: [${typeLabel(item)}] ${titleOf(item)}`);
+  printResult(`Done: [${typeLabel(item)}] ${titleOf(item)}`);
 }
 
 function reviewSelected(db, rootId, contextId, passed) {
   const item = selectedQueueItem(db, rootId, contextId);
-  if (!item || item.type !== 'flashcard') return console.log('Selected queue item is not a flash card.');
+  if (!item || item.type !== 'flashcard') return printResult('Selected queue item is not a flash card.');
   applyReview(item, passed);
   recordActivity(db);
   saveDb(db);
-  console.log(passed ? 'Reviewed: pass' : 'Reviewed: fail');
+  printResult(passed ? 'Reviewed: pass' : 'Reviewed: fail');
 }
 
 function reviewCurrent(db, contextId, passed) {
   const item = itemById(db, contextId);
-  if (!item || item.type !== 'flashcard') return console.log('Current queue item is not a flash card.');
+  if (!item || item.type !== 'flashcard') return printResult('Current queue item is not a flash card.');
   applyReview(item, passed);
   recordActivity(db);
   saveDb(db);
-  console.log(passed ? 'Reviewed: pass' : 'Reviewed: fail');
+  printResult(passed ? 'Reviewed: pass' : 'Reviewed: fail');
 }
 
 async function studyFlashcard(db, item, { applySchedule = false } = {}) {
@@ -358,7 +373,7 @@ async function studyFlashcard(db, item, { applySchedule = false } = {}) {
   if (applySchedule) {
     applyReviewGrade(item, grade);
     recordActivity(db);
-    console.log(`Reviewed: ${grade}`);
+    printResult(`Reviewed: ${grade}`);
   }
   return grade;
 }
@@ -399,11 +414,10 @@ async function showRootQueueItem(db, rootId, contextId) {
   saveDb(nextDb);
   const nextItem = nextQueue[cursorFor(nextDb, rootId, ROOT_QUEUE_CONTEXT, nextQueue.length)];
   if (!nextItem) {
-    console.log('Root queue is empty.');
+    printResult('Root queue is empty.');
     return rootId;
   }
-  console.log('');
-  printContext(nextDb, nextItem.id);
+  printContextWithGap(nextDb, nextItem.id);
   return nextItem.id;
 }
 
@@ -421,8 +435,8 @@ function moveRootQueue(db, rootId, delta) {
 
 function excludeCurrentQueueItem(db, rootId, contextId) {
   const item = itemById(db, contextId);
-  if (!item || item.type === 'root') return console.log('Current queue item cannot be marked done.');
-  if (item.type === 'flashcard') return console.log('Flash cards cannot be marked done. Review them instead.');
+  if (!item || item.type === 'root') return printResult('Current queue item cannot be marked done.');
+  if (item.type === 'flashcard') return printResult('Flash cards cannot be marked done. Review them instead.');
   const previousQueue = rootQueueFor(db, rootId);
   const previousIndex = Math.max(0, previousQueue.findIndex((candidate) => candidate.id === contextId));
   item.excluded = true;
@@ -430,7 +444,7 @@ function excludeCurrentQueueItem(db, rootId, contextId) {
   const nextQueue = rootQueueFor(db, rootId);
   setCursor(db, rootId, ROOT_QUEUE_CONTEXT, previousIndex, nextQueue.length);
   saveDb(db);
-  console.log(`Done: [${typeLabel(item)}] ${titleOf(item)}`);
+  printResult(`Done: [${typeLabel(item)}] ${titleOf(item)}`);
   return nextQueue[cursorFor(db, rootId, ROOT_QUEUE_CONTEXT, nextQueue.length)]?.id ?? null;
 }
 
@@ -492,7 +506,7 @@ async function run() {
       const rootId = await newRoot(db);
       if (rootId) contextId = rootId;
       inRootQueue = false;
-      printContext(loadDb(), contextId);
+      printContextWithGap(loadDb(), contextId);
       continue;
     }
 
@@ -501,7 +515,7 @@ async function run() {
       if (rootId) {
         contextId = rootId;
         inRootQueue = false;
-        printContext(db, contextId);
+        printContextWithGap(db, contextId);
       }
       continue;
     }
@@ -509,16 +523,14 @@ async function run() {
     if (!contextId) {
       if (normalized.startsWith('sort ')) {
         if (sortRootList(db, command)) {
-          console.log('');
-          printRoots(loadDb());
+          printRootsWithGap(loadDb());
           continue;
         }
       }
 
       if (normalized.startsWith('del ')) {
         deleteFromRootList(db, command.slice(4).trim());
-        console.log('');
-        printRoots(loadDb());
+        printRootsWithGap(loadDb());
         continue;
       }
 
@@ -532,7 +544,7 @@ async function run() {
         saveDb(db);
         contextId = root.id;
         inRootQueue = false;
-        printContext(db, contextId);
+        printContextWithGap(db, contextId);
         continue;
       }
     }
@@ -552,7 +564,7 @@ async function run() {
     if (normalized === 'home' || normalized === 'root') {
       contextId = rootId;
       inRootQueue = false;
-      printContext(db, contextId);
+      printContextWithGap(db, contextId);
       continue;
     }
     if (normalized === 'que') {
@@ -565,32 +577,32 @@ async function run() {
     if (normalized === 'back') {
       contextId = parentIdFor(db, contextId);
       inRootQueue = false;
-      printContext(db, contextId);
+      printContextWithGap(db, contextId);
       continue;
     }
     if (normalized === 'new branch' || normalized === 'b' || normalized === 'ㅠ') {
       contextId = await createItem(db, contextId, 'branch');
-      printContext(loadDb(), contextId);
+      printContextWithGap(loadDb(), contextId);
       continue;
     }
     if (normalized === 'new leaf' || normalized === 'l' || normalized === 'ㅣ') {
       contextId = await createItem(db, contextId, 'leaf');
-      printContext(loadDb(), contextId);
+      printContextWithGap(loadDb(), contextId);
       continue;
     }
     if (normalized === 'new note' || normalized === 'n' || normalized === 'ㅜ') {
       contextId = await createItem(db, contextId, 'note');
-      printContext(loadDb(), contextId);
+      printContextWithGap(loadDb(), contextId);
       continue;
     }
     if (normalized === 'basic') {
       await createBasic(db, contextId);
-      printContext(loadDb(), contextId);
+      printContextWithGap(loadDb(), contextId);
       continue;
     }
     if (normalized === 'cloze') {
       await createCloze(db, contextId);
-      printContext(loadDb(), contextId);
+      printContextWithGap(loadDb(), contextId);
       continue;
     }
     if (normalized === ']' || normalized === 'next') {
@@ -622,8 +634,7 @@ async function run() {
         const nextId = excludeCurrentQueueItem(db, rootId, contextId);
         if (nextId) {
           contextId = nextId;
-          console.log('');
-          printContext(loadDb(), contextId);
+          printContextWithGap(loadDb(), contextId);
         }
       } else {
         excludeSelected(db, rootId, contextId);
@@ -632,14 +643,12 @@ async function run() {
     }
     if (normalized.startsWith('del ')) {
       deleteFromQueue(db, rootId, contextId, command.slice(4).trim());
-      console.log('');
-      printContext(loadDb(), contextId);
+      printContextWithGap(loadDb(), contextId);
       continue;
     }
     if (normalized.startsWith('sort ')) {
       if (sortContextList(db, rootId, contextId, command)) {
-        console.log('');
-        printContext(loadDb(), contextId);
+        printContextWithGap(loadDb(), contextId);
         continue;
       }
     }
@@ -657,7 +666,7 @@ async function run() {
     if (selected) {
       contextId = selected.id;
       inRootQueue = false;
-      printContext(db, contextId);
+      printContextWithGap(db, contextId);
       continue;
     }
 
