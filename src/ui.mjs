@@ -189,8 +189,7 @@ export function printIntro(db, output = process.stdout) {
     '    ██║██║╚██╗██║   ██║   ',
     '    ██║██║ ╚████║   ██║   ',
     '    ╚═╝╚═╝  ╚═══╝   ╚═╝   ',
-    `    Version ${APP_VERSION}`,
-    `    Developer ${DEVELOPER}`,
+    `    version ${APP_VERSION} by ${DEVELOPER}`,
     '    Type help for commands.'
   ];
   const heat = heatmapLines(db);

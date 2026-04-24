@@ -35,3 +35,15 @@
 - `node --check src\ui.mjs` and `node --check src\cli.mjs` passed.
 - `npm run smoke` passed.
 - Empty-home output includes `Create your first root with "new root".`
+
+# Intro Metadata Simplification
+
+- [x] Plan: replace the two intro metadata lines with one compact line.
+- [x] Implement: render `version n.n.n by Jay` under the logo.
+- [x] Verify: run syntax checks, smoke test, and intro output check.
+
+## Review
+
+- `node --check src\ui.mjs` and `node --check src\cli.mjs` passed.
+- `npm run smoke` passed.
+- Intro output now includes `version 0.1.0 by Jay` and no separate `Version` / `Developer` lines.
