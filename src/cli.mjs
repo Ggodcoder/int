@@ -363,14 +363,13 @@ async function studyFlashcard(db, item, { applySchedule = false } = {}) {
   return grade;
 }
 
-function enterRootQueue(db, rootId, contextId) {
+function enterRootQueue(db, rootId, contextId, { resume = false } = {}) {
   const queue = rootQueueFor(db, rootId);
   if (queue.length === 0) {
     console.log('Root queue is empty.');
     return { contextId, entered: false };
   }
-  const currentIndex = queue.findIndex((item) => item.id === contextId);
-  const index = currentIndex >= 0 ? currentIndex : cursorFor(db, rootId, ROOT_QUEUE_CONTEXT, queue.length);
+  const index = resume ? cursorFor(db, rootId, ROOT_QUEUE_CONTEXT, queue.length) : 0;
   setCursor(db, rootId, ROOT_QUEUE_CONTEXT, index, queue.length);
   saveDb(db);
   return { contextId: queue[index].id, entered: true };
@@ -553,7 +552,7 @@ async function run() {
       continue;
     }
     if (normalized === 'que') {
-      const result = enterRootQueue(db, rootId, contextId);
+      const result = enterRootQueue(db, rootId, contextId, { resume: inRootQueue });
       contextId = result.contextId;
       inRootQueue = result.entered;
       if (result.entered) contextId = await showRootQueueItem(loadDb(), rootId, contextId);
