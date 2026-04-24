@@ -177,13 +177,19 @@ This boundary is used for queue sessions, today-due review cards, and the review
 
 ## Data / 데이터
 
-Data is stored locally beside the app:
+Data is stored in the current user's app data folder:
 
-데이터는 앱 폴더 안에 로컬로 저장됩니다.
+데이터는 현재 사용자의 앱 데이터 폴더에 저장됩니다.
 
 ```text
-data/int-db.json
+Windows: %APPDATA%/Int/int-db.json
+macOS:   ~/Library/Application Support/Int/int-db.json
+Linux:   ~/.local/share/int/int-db.json
 ```
+
+Set `INT_DB_FILE` to use a custom database path.
+
+`INT_DB_FILE` 환경변수로 데이터베이스 경로를 직접 지정할 수 있습니다.
 
 ## License Notices / 라이선스 표기
 
