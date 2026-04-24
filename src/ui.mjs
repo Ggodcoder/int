@@ -97,6 +97,7 @@ Delete
   del n          delete one listed item
   del n:m        delete a range of listed items
   del n // m     delete several listed items
+  del on home    delete roots from the root list
 
 Navigation
   root / home    return to the current root

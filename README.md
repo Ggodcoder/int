@@ -145,8 +145,10 @@ drill 진행 중 새로 추가된 카드는 현재 drill이 all clear된 뒤 다
 ## Delete / 삭제
 
 Deleting an item also deletes its children.
+The same `del` commands work on the home root list, where they delete roots and all of their items.
 
 부모 항목을 삭제하면 자식 항목도 함께 삭제됩니다.
+홈 화면의 root 목록에서도 같은 `del` 명령을 사용할 수 있으며, root와 모든 하위 항목이 함께 삭제됩니다.
 
 ```text
 del n

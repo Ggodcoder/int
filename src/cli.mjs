@@ -190,6 +190,34 @@ function deleteFromQueue(db, rootId, contextId, spec) {
   if (invalid.length > 0) console.log(`Skipped invalid index: ${invalid.join(', ')}`);
 }
 
+function deleteFromRootList(db, spec) {
+  if (db.roots.length === 0) return console.log('Root list is empty.');
+
+  const { indices, invalid } = parseDeleteSpec(spec, db.roots.length);
+  if (indices.length === 0) {
+    console.log(invalid.length > 0 ? `Nothing deleted. Invalid index: ${invalid.join(', ')}` : 'Nothing deleted.');
+    return;
+  }
+
+  const rootIds = new Set(indices.map((index) => db.roots[index - 1].id));
+  const childCount = db.items.filter((item) => rootIds.has(item.rootId)).length;
+  db.roots = db.roots.filter((root) => !rootIds.has(root.id));
+  db.items = db.items.filter((item) => !rootIds.has(item.rootId));
+
+  for (const rootId of rootIds) {
+    delete db.app.sessions[rootId];
+    delete db.app.drill[rootId];
+  }
+  if (rootIds.has(db.app.activeRootId)) db.app.activeRootId = null;
+
+  saveDb(db);
+
+  const selectedText = indices.length === 1 ? '1 selected root' : `${indices.length} selected roots`;
+  const totalText = childCount > 0 ? ` (${childCount + indices.length} total with children)` : '';
+  console.log(`Deleted ${selectedText}${totalText}.`);
+  if (invalid.length > 0) console.log(`Skipped invalid index: ${invalid.join(', ')}`);
+}
+
 function moveQueue(db, rootId, contextId, delta) {
   const queue = queueForContext(db, rootId, contextId);
   if (queue.length === 0) return console.log('Queue is empty.');
@@ -381,6 +409,13 @@ async function run() {
     }
 
     if (!contextId) {
+      if (normalized.startsWith('del ')) {
+        deleteFromRootList(db, command.slice(4).trim());
+        console.log('');
+        printRoots(loadDb());
+        continue;
+      }
+
       const byNumber = Number.parseInt(command, 10);
       const root = Number.isInteger(byNumber) && db.roots[byNumber - 1]
         ? db.roots[byNumber - 1]
