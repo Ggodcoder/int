@@ -12,6 +12,7 @@ import {
   makeItems,
   makeRoots,
   maskText,
+  sortedRoots,
   titleOf,
   typeLabel
 } from './items.mjs';
@@ -50,9 +51,10 @@ async function setRoot(db) {
   if (db.roots.length === 0) return null;
   const choice = await askValue(rl, 'type>');
   if (!choice) return null;
+  const roots = sortedRoots(db);
   const byNumber = Number.parseInt(choice, 10);
-  const root = Number.isInteger(byNumber) && db.roots[byNumber - 1]
-    ? db.roots[byNumber - 1]
+  const root = Number.isInteger(byNumber) && roots[byNumber - 1]
+    ? roots[byNumber - 1]
     : db.roots.find((candidate) => candidate.title.toLowerCase() === choice.toLowerCase());
   if (!root) {
     console.log('Root not found.');
@@ -193,13 +195,14 @@ function deleteFromQueue(db, rootId, contextId, spec) {
 function deleteFromRootList(db, spec) {
   if (db.roots.length === 0) return console.log('Root list is empty.');
 
-  const { indices, invalid } = parseDeleteSpec(spec, db.roots.length);
+  const roots = sortedRoots(db);
+  const { indices, invalid } = parseDeleteSpec(spec, roots.length);
   if (indices.length === 0) {
     console.log(invalid.length > 0 ? `Nothing deleted. Invalid index: ${invalid.join(', ')}` : 'Nothing deleted.');
     return;
   }
 
-  const rootIds = new Set(indices.map((index) => db.roots[index - 1].id));
+  const rootIds = new Set(indices.map((index) => roots[index - 1].id));
   const childCount = db.items.filter((item) => rootIds.has(item.rootId)).length;
   db.roots = db.roots.filter((root) => !rootIds.has(root.id));
   db.items = db.items.filter((item) => !rootIds.has(item.rootId));
@@ -216,6 +219,96 @@ function deleteFromRootList(db, spec) {
   const totalText = childCount > 0 ? ` (${childCount + indices.length} total with children)` : '';
   console.log(`Deleted ${selectedText}${totalText}.`);
   if (invalid.length > 0) console.log(`Skipped invalid index: ${invalid.join(', ')}`);
+}
+
+function parseSortSpec(command) {
+  const match = command.match(/^sort\s+(\d+)\s+(.+)$/i);
+  if (!match) return null;
+  return { source: Number.parseInt(match[1], 10), destination: match[2].trim().toLowerCase() };
+}
+
+function applyListOrder(list) {
+  list.forEach((item, index) => {
+    item.sortOrder = index;
+  });
+}
+
+function moveListItem(list, sourceIndex, destination) {
+  if (list.length === 0) return { ok: false, message: 'List is empty.' };
+  if (!Number.isInteger(sourceIndex) || sourceIndex < 1 || sourceIndex > list.length) {
+    return { ok: false, message: 'Invalid source index.' };
+  }
+
+  const moving = list[sourceIndex - 1];
+  const remaining = list.filter((item) => item.id !== moving.id);
+
+  if (destination === 'top') {
+    applyListOrder([moving, ...remaining]);
+    return { ok: true };
+  }
+
+  if (destination === 'bottom') {
+    applyListOrder([...remaining, moving]);
+    return { ok: true };
+  }
+
+  const between = destination.match(/^(\d+)\s*:\s*(\d+)$/);
+  if (!between) return { ok: false, message: 'Invalid sort target. Use top, bottom, or x:y.' };
+
+  const leftIndex = Number.parseInt(between[1], 10);
+  const rightIndex = Number.parseInt(between[2], 10);
+  if (
+    leftIndex < 1 ||
+    leftIndex > list.length ||
+    rightIndex < 1 ||
+    rightIndex > list.length ||
+    leftIndex === sourceIndex ||
+    rightIndex === sourceIndex
+  ) {
+    return { ok: false, message: 'Invalid sort target.' };
+  }
+
+  const left = list[leftIndex - 1];
+  const right = list[rightIndex - 1];
+  const leftRemainingIndex = remaining.findIndex((item) => item.id === left.id);
+  const rightRemainingIndex = remaining.findIndex((item) => item.id === right.id);
+  if (leftRemainingIndex < 0 || rightRemainingIndex < 0) {
+    return { ok: false, message: 'Invalid sort target.' };
+  }
+
+  const insertAt = Math.max(leftRemainingIndex, rightRemainingIndex);
+  remaining.splice(insertAt, 0, moving);
+  applyListOrder(remaining);
+  return { ok: true };
+}
+
+function sortRootList(db, command) {
+  const spec = parseSortSpec(command);
+  if (!spec) return false;
+  const roots = sortedRoots(db);
+  const result = moveListItem(roots, spec.source, spec.destination);
+  if (!result.ok) {
+    console.log(result.message);
+    return true;
+  }
+  saveDb(db);
+  console.log('Sorted.');
+  return true;
+}
+
+function sortContextList(db, rootId, contextId, command) {
+  const spec = parseSortSpec(command);
+  if (!spec) return false;
+  const list = queueForContext(db, rootId, contextId);
+  const result = moveListItem(list, spec.source, spec.destination);
+  if (!result.ok) {
+    console.log(result.message);
+    return true;
+  }
+  setCursor(db, rootId, contextId, 0, list.length);
+  saveDb(db);
+  console.log('Sorted.');
+  return true;
 }
 
 function moveQueue(db, rootId, contextId, delta) {
@@ -409,6 +502,14 @@ async function run() {
     }
 
     if (!contextId) {
+      if (normalized.startsWith('sort ')) {
+        if (sortRootList(db, command)) {
+          console.log('');
+          printRoots(loadDb());
+          continue;
+        }
+      }
+
       if (normalized.startsWith('del ')) {
         deleteFromRootList(db, command.slice(4).trim());
         console.log('');
@@ -417,8 +518,9 @@ async function run() {
       }
 
       const byNumber = Number.parseInt(command, 10);
-      const root = Number.isInteger(byNumber) && db.roots[byNumber - 1]
-        ? db.roots[byNumber - 1]
+      const roots = sortedRoots(db);
+      const root = Number.isInteger(byNumber) && roots[byNumber - 1]
+        ? roots[byNumber - 1]
         : db.roots.find((candidate) => candidate.title.toLowerCase() === command.toLowerCase());
       if (root) {
         db.app.activeRootId = root.id;
@@ -528,6 +630,13 @@ async function run() {
       console.log('');
       printContext(loadDb(), contextId);
       continue;
+    }
+    if (normalized.startsWith('sort ')) {
+      if (sortContextList(db, rootId, contextId, command)) {
+        console.log('');
+        printContext(loadDb(), contextId);
+        continue;
+      }
     }
     if (normalized === 'pass' || normalized === 'fail') {
       if (inRootQueue) reviewCurrent(db, contextId, normalized === 'pass');

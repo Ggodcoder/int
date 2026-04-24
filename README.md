@@ -156,6 +156,24 @@ del n:m
 del n // m // ...
 ```
 
+## Sort / 순서 변경
+
+Lists are ordered oldest-first by default, regardless of item type.
+Use `sort` to manually reorder the current list. The changed order is saved and restored after restart.
+
+list는 기본적으로 항목 종류와 상관없이 생성 오래된 순으로 표시됩니다.
+`sort`로 현재 list의 순서를 직접 바꿀 수 있으며, 변경된 순서는 앱 종료 후에도 유지됩니다.
+
+```text
+sort n x:y
+sort n top
+sort n bottom
+```
+
+`sort n x:y` moves item `n` between items `x` and `y`.
+
+`sort n x:y`는 `n`번 항목을 `x`번 항목과 `y`번 항목 사이로 이동합니다.
+
 ## Learning Day Time / 학습일 기준 시간
 
 The default learning day starts at `00:00`.

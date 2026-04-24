@@ -1,4 +1,4 @@
-import { ancestorsOf, itemById, statsForRoot, titleOf, typeLabel } from './items.mjs';
+import { ancestorsOf, itemById, sortedRoots, statsForRoot, titleOf, typeLabel } from './items.mjs';
 import { cursorFor, isDueFlashcard, queueForContext } from './queue.mjs';
 import { activityStats, yearlyActivity } from './activity.mjs';
 
@@ -98,6 +98,11 @@ Delete
   del n:m        delete a range of listed items
   del n // m     delete several listed items
   del on home    delete roots from the root list
+
+Sort
+  sort n x:y     move item n between items x and y
+  sort n top     move item n to the top
+  sort n bottom  move item n to the bottom
 
 Navigation
   root / home    return to the current root
@@ -213,7 +218,7 @@ export function printRoots(db) {
     return;
   }
   console.log('Roots');
-  db.roots.forEach((root, index) => console.log(`  ${index + 1}. ${root.title} (${listCountFor(db, root)})`));
+  sortedRoots(db).forEach((root, index) => console.log(`  ${index + 1}. ${root.title} (${listCountFor(db, root)})`));
 }
 
 export function printFlashcard(item) {

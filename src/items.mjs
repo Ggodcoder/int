@@ -18,6 +18,18 @@ export function itemById(db, itemId) {
   return db.roots.find((root) => root.id === itemId) ?? db.items.find((item) => item.id === itemId);
 }
 
+export function listSort(a, b) {
+  const createdA = Date.parse(a.createdAt);
+  const createdB = Date.parse(b.createdAt);
+  const orderA = Number.isFinite(a.sortOrder) ? a.sortOrder : Number.isFinite(createdA) ? createdA : 0;
+  const orderB = Number.isFinite(b.sortOrder) ? b.sortOrder : Number.isFinite(createdB) ? createdB : 0;
+  return orderA - orderB || a.createdAt.localeCompare(b.createdAt);
+}
+
+export function sortedRoots(db) {
+  return [...db.roots].sort(listSort);
+}
+
 export function rootIdOf(item) {
   if (!item) return null;
   return item.type === 'root' ? item.id : item.rootId;
@@ -43,7 +55,7 @@ export function ancestorsOf(db, itemId) {
 export function childrenOf(db, rootId, parentId) {
   return db.items
     .filter((item) => item.rootId === rootId && item.parentId === parentId && !item.excluded)
-    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    .sort(listSort);
 }
 
 export function descendantsOf(db, rootId, parentId = rootId) {

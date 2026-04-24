@@ -55,15 +55,17 @@ export function dueFlashcardsInRoot(db, rootId) {
 export function rootQueueFor(db, rootId) {
   const boundary = dayBoundaryFor(db);
   const dueIds = new Set(dueFlashcardsInRoot(db, rootId).map((item) => item.id));
-  const regular = db.items.filter((item) => item.rootId === rootId && !item.excluded && item.type !== 'flashcard');
+  const regular = db.items
+    .filter((item) => item.rootId === rootId && !item.excluded && item.type !== 'flashcard')
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   const due = db.items.filter((item) => dueIds.has(item.id));
-  return [...due, ...regular].sort(queueSort(boundary));
+  return [...due.sort(queueSort(boundary)), ...regular];
 }
 
 export function queueForContext(db, rootId, contextId) {
   const context = itemById(db, contextId);
   if (!context || !belongsToRoot(context, rootId)) return [];
-  return childrenOf(db, rootId, contextId).sort(queueSort(dayBoundaryFor(db)));
+  return childrenOf(db, rootId, contextId);
 }
 
 export function sessionFor(db, rootId) {
