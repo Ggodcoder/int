@@ -5,6 +5,14 @@ export function splitTypeEntries(value) {
     .filter(Boolean);
 }
 
+function dropLastGrapheme(value) {
+  if (typeof Intl?.Segmenter === 'function') {
+    const segments = [...new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(value)];
+    return segments.slice(0, -1).map((segment) => segment.segment).join('');
+  }
+  return [...value].slice(0, -1).join('');
+}
+
 export async function askValue(rl, prompt) {
   if (rl.input?.isTTY && typeof rl.input.setRawMode === 'function') {
     return askRawLine(rl, prompt);
@@ -30,13 +38,15 @@ function askRawLine(rl, prompt, { grayLine = false, keepEmpty = false } = {}) {
     let value = '';
     const bg = '\x1b[48;5;236m';
     const reset = '\x1b[0m';
+    const clearLine = '\x1b[2K';
 
-    const drawPrompt = () => {
+    const renderLine = () => {
+      output.write(`\r${clearLine}`);
       if (!grayLine) {
-        output.write(`${prompt} `);
+        output.write(`${prompt} ${value}`);
         return;
       }
-      output.write(`${bg}${prompt}`);
+      output.write(`${bg}${prompt}${value}${reset}`);
     };
 
     const finish = (result) => {
@@ -67,18 +77,18 @@ function askRawLine(rl, prompt, { grayLine = false, keepEmpty = false } = {}) {
       }
       if (text === '\x7f' || text === '\b') {
         if (value.length > 0) {
-          value = [...value].slice(0, -1).join('');
-          output.write(`\b${grayLine ? bg : ''} \b`);
+          value = dropLastGrapheme(value);
+          renderLine();
         }
         return;
       }
       value += text;
-      output.write(`${bg}${text}`);
+      renderLine();
     };
 
     rl.pause();
     for (const listener of dataListeners) input.off('data', listener);
-    drawPrompt();
+    renderLine();
     input.setRawMode(true);
     input.resume();
     input.on('data', onData);
