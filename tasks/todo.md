@@ -23,3 +23,15 @@
 - `node --check src\ui.mjs` and `node --check src\cli.mjs` passed.
 - `npm run smoke` passed.
 - Intro output now includes `Version 0.1.0` and `Developer Jay` before `Type help for commands.`
+
+# Empty Home Guidance
+
+- [x] Plan: show a one-line English guide when the home screen has no roots.
+- [x] Implement: print the guide under the intro instead of leaving the content area empty.
+- [x] Verify: run syntax checks, smoke test, and empty-home output check.
+
+## Review
+
+- `node --check src\ui.mjs` and `node --check src\cli.mjs` passed.
+- `npm run smoke` passed.
+- Empty-home output includes `Create your first root with "new root".`

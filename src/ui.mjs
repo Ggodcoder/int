@@ -213,11 +213,14 @@ export function printIntro(db, output = process.stdout) {
 export function printStartView(db, output = process.stdout) {
   console.log('');
   printIntro(db, output);
-  if (db.roots.length > 0) {
+  console.log('');
+  if (db.roots.length === 0) {
+    console.log('Create your first root with "new root".');
     console.log('');
-    printRoots(db);
-    console.log('');
+    return;
   }
+  printRoots(db);
+  console.log('');
 }
 
 export function printRoots(db) {
