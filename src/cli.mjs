@@ -26,19 +26,26 @@ import { recordActivity } from './activity.mjs';
 const rl = createInterface({ input, output });
 const ROOT_QUEUE_CONTEXT = '__root_queue__';
 
-function printResult(message) {
+function printBlock(render) {
   console.log('');
-  console.log(message);
+  render();
+  console.log('');
+}
+
+function printResult(message) {
+  printBlock(() => console.log(message));
 }
 
 function printContextWithGap(db, contextId) {
-  console.log('');
-  printContext(db, contextId);
+  printBlock(() => printContext(db, contextId));
 }
 
 function printRootsWithGap(db) {
-  console.log('');
-  printRoots(db);
+  printBlock(() => printRoots(db));
+}
+
+function printQueueProgressWithGap(current, total) {
+  printBlock(() => printQueueProgress(current, total));
 }
 
 function pluralType(type) {
@@ -328,13 +335,15 @@ function sortContextList(db, rootId, contextId, command) {
 
 function moveQueue(db, rootId, contextId, delta) {
   const queue = queueForContext(db, rootId, contextId);
-  if (queue.length === 0) return console.log('Queue is empty.');
+  if (queue.length === 0) return printResult('Queue is empty.');
   const current = cursorFor(db, rootId, contextId, queue.length);
   setCursor(db, rootId, contextId, current + delta, queue.length);
   saveDb(db);
   const item = selectedQueueItem(db, rootId, contextId);
-  console.log(`[${typeLabel(item)}] ${titleOf(item)}`);
-  if (item.type === 'flashcard') printFlashcard(item);
+  printBlock(() => {
+    console.log(`[${typeLabel(item)}] ${titleOf(item)}`);
+    if (item.type === 'flashcard') printFlashcard(item);
+  });
 }
 
 function excludeSelected(db, rootId, contextId) {
@@ -381,7 +390,7 @@ async function studyFlashcard(db, item, { applySchedule = false } = {}) {
 function enterRootQueue(db, rootId, contextId, { resume = false } = {}) {
   const queue = rootQueueFor(db, rootId);
   if (queue.length === 0) {
-    console.log('Root queue is empty.');
+    printResult('Root queue is empty.');
     return { contextId, entered: false };
   }
   const session = sessionFor(db, rootId);
@@ -398,7 +407,7 @@ async function showRootQueueItem(db, rootId, contextId) {
   if (!item) return contextId;
   const queue = rootQueueFor(db, rootId);
   const currentIndex = Math.max(0, queue.findIndex((candidate) => candidate.id === contextId));
-  printQueueProgress(currentIndex + 1, queue.length);
+  printQueueProgressWithGap(currentIndex + 1, queue.length);
   if (item.type !== 'flashcard') {
     printContext(db, contextId);
     return contextId;
@@ -424,7 +433,7 @@ async function showRootQueueItem(db, rootId, contextId) {
 function moveRootQueue(db, rootId, delta) {
   const queue = rootQueueFor(db, rootId);
   if (queue.length === 0) {
-    console.log('Root queue is empty.');
+    printResult('Root queue is empty.');
     return null;
   }
   const current = cursorFor(db, rootId, ROOT_QUEUE_CONTEXT, queue.length);
@@ -469,7 +478,7 @@ async function run() {
 
   printStartView(db);
   if (db.roots.length > 0) {
-    needsPromptGap = true;
+    needsPromptGap = false;
   }
 
   while (true) {
@@ -493,7 +502,7 @@ async function run() {
       contextId = null;
       inRootQueue = false;
       printStartView(db);
-      needsPromptGap = db.roots.length > 0;
+      needsPromptGap = false;
       continue;
     }
 
@@ -550,7 +559,7 @@ async function run() {
     }
 
     if (!contextId) {
-      console.log('Use "new root" or "set root" first.');
+      printResult('Use "new root" or "set root" first.');
       continue;
     }
 
@@ -558,7 +567,7 @@ async function run() {
     const rootId = context.type === 'root' ? context.id : context.rootId;
 
     if (normalized === 'where') {
-      printContext(db, contextId);
+      printContextWithGap(db, contextId);
       continue;
     }
     if (normalized === 'home' || normalized === 'root') {
@@ -670,7 +679,7 @@ async function run() {
       continue;
     }
 
-    console.log('Unknown command. Type help.');
+    printResult('Unknown command. Type help.');
   }
 
   await rl.close();

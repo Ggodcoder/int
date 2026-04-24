@@ -210,6 +210,7 @@ export function printStartView(db, output = process.stdout) {
   if (db.roots.length > 0) {
     console.log('');
     printRoots(db);
+    console.log('');
   }
 }
 
@@ -276,7 +277,6 @@ export function printContext(db, contextId) {
 }
 
 export function printQueueProgress(current, total) {
-  console.log('');
   console.log(`${current}/${total}`);
 }
 
