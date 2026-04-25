@@ -2,7 +2,7 @@
 import { createInterface } from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
 import { loadDb, saveDb, DB_FILE } from './db.mjs';
-import { askCommand, askStudyGrade, askTypeEntries, askValue } from './input.mjs';
+import { askCommand, askStudyGrade, askTypeEntries, askTypeEntriesRelay, askValue } from './input.mjs';
 import {
   canCreate,
   deleteSubtrees,
@@ -180,16 +180,11 @@ async function createItem(db, contextId, type) {
     printResult(`Cannot create ${type} here.`);
     return { contextId, messages: [] };
   }
-  const items = [];
-  while (true) {
-    const titles = await askTypeEntries(rl);
-    if (titles.length === 0) break;
-    const batch = makeItems(context, type, titles);
-    db.items.push(...batch);
-    items.push(...batch);
-    saveDb(db);
-  }
+  const titles = await askTypeEntriesRelay(rl);
+  const items = makeItems(context, type, titles);
   if (items.length === 0) return { contextId, messages: [] };
+  db.items.push(...items);
+  saveDb(db);
   return {
     contextId,
     messages: [items.length === 1 ? `Created ${type}: ${items[0].title}` : `Created ${items.length} ${pluralType(type)}.`]

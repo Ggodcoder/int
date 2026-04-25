@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { render } from '@inquirer/testing';
-import { drillResultPrompt, exactLinePrompt, shouldUseFramePrompt, studyGradePrompt } from '../src/input.mjs';
+import { drillResultPrompt, exactLinePrompt, shouldUseFramePrompt, studyGradePrompt, typeEntriesRelayPrompt } from '../src/input.mjs';
 import { promptContent, promptFrame, renderLinePrompt, renderRevealPrompt } from '../src/tui/input.mjs';
 import { createFrame } from '../src/tui/renderer.mjs';
 
@@ -132,6 +132,38 @@ test('line prompt supports Korean text and cancel', async () => {
   const canceled = await render(exactLinePrompt, { prompt: 'type>', keepEmpty: false });
   canceled.events.keypress('escape');
   assert.equal(await canceled.answer, null);
+});
+
+test('type relay prompt keeps collecting entries until empty enter', async () => {
+  const baseFrame = createFrame(['body'], { kind: 'context' });
+  const { answer, events, getScreen, nextRender } = await render(typeEntriesRelayPrompt, {
+    prompt: 'type>',
+    framePrompt: true,
+    baseFrame
+  });
+
+  events.type('note 1');
+  await nextRender();
+  assert.equal(getScreen().endsWith('type> note 1'), true);
+  events.keypress('enter');
+  await nextRender();
+  assert.equal(getScreen().endsWith('type>'), true);
+  events.type('note 2 // note 3');
+  events.keypress('enter');
+  await nextRender();
+  events.keypress('enter');
+
+  assert.deepEqual(await answer, ['note 1', 'note 2', 'note 3']);
+});
+
+test('type relay prompt returns collected entries on escape', async () => {
+  const { answer, events } = await render(typeEntriesRelayPrompt, { prompt: 'type>' });
+
+  events.type('branch 1');
+  events.keypress('enter');
+  events.keypress('escape');
+
+  assert.deepEqual(await answer, ['branch 1']);
 });
 
 test('study grade prompt reveals then accepts 1-4 grade', async () => {

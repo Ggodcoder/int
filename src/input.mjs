@@ -54,6 +54,55 @@ export const exactLinePrompt = createPrompt((config, done) => {
   return renderLinePrompt({ prompt: config.prompt, value, accent: config.accent !== false });
 });
 
+export const typeEntriesRelayPrompt = createPrompt((config, done) => {
+  const [status, setStatus] = useState('idle');
+  const [value, setValue] = useState('');
+  const latestValue = useRef('');
+  const entries = useRef([]);
+
+  const syncLine = (rl, next) => {
+    latestValue.current = next;
+    setValue(next);
+    rl.line = next;
+    rl.cursor = Array.from(next).length;
+  };
+
+  useKeypress((key, rl) => {
+    if (status !== 'idle') return;
+    if (key.name === 'escape' || key.sequence === '\x1b') {
+      latestValue.current = 'canceled';
+      setValue('canceled');
+      setStatus('done');
+      done(entries.current);
+      return;
+    }
+    if (isEnterKey(key)) {
+      const answer = latestValue.current.trim();
+      if (!answer) {
+        setStatus('done');
+        done(entries.current);
+        return;
+      }
+      entries.current = [...entries.current, ...splitTypeEntries(answer)];
+      syncLine(rl, '');
+      return;
+    }
+    if (key.name === 'backspace' || key.sequence === '\x7f' || key.sequence === '\b') {
+      syncLine(rl, Array.from(latestValue.current).slice(0, -1).join(''));
+      return;
+    }
+    if (key.ctrl || key.meta || key.name === 'tab' || key.name === 'delete') return;
+    if (key.sequence && !/[\r\n\x1b\x7f\b]/.test(key.sequence)) {
+      syncLine(rl, `${latestValue.current}${key.sequence}`);
+    }
+  });
+
+  if (config.framePrompt && config.baseFrame) {
+    return promptContent(config.baseFrame, { prompt: config.prompt, value, accent: config.accent !== false });
+  }
+  return renderLinePrompt({ prompt: config.prompt, value, accent: config.accent !== false });
+});
+
 export const studyGradePrompt = createPrompt((config, done) => {
   const [status, setStatus] = useState('idle');
   const [revealed, setRevealed] = useState(false);
@@ -153,6 +202,36 @@ export async function askCommand(rl, prompt = 'int> ') {
 export async function askTypeEntries(rl) {
   const value = await askValue(rl, 'type>');
   return value ? splitTypeEntries(value) : [];
+}
+
+export async function askTypeEntriesRelay(rl) {
+  if (rl.input?.isTTY && typeof rl.input.setRawMode === 'function') {
+    const currentFrame = shouldUseFramePrompt() ? screenSession.current() : null;
+    const baseFrame = currentFrame?.meta?.transient ? null : currentFrame;
+    if (baseFrame) clearScreen();
+    try {
+      return await typeEntriesRelayPrompt(
+        { prompt: 'type>', accent: true, framePrompt: Boolean(baseFrame), baseFrame },
+        {
+          input: process.stdin,
+          output: process.stdout,
+          clearPromptOnDone: false
+        }
+      );
+    } catch (error) {
+      if (error?.name === 'CancelPromptError') return [];
+      if (error?.name === 'ExitPromptError') process.exit(130);
+      throw error;
+    }
+  }
+
+  const entries = [];
+  while (true) {
+    const titles = await askTypeEntries(rl);
+    if (titles.length === 0) break;
+    entries.push(...titles);
+  }
+  return entries;
 }
 
 export async function askStudyGrade(rl, onReveal) {
