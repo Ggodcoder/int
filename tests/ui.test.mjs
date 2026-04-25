@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { contextLines, rootsLines, startViewLines } from '../src/ui.mjs';
+import { contextLines, introLines, rootsLines, startViewLines } from '../src/ui.mjs';
 import { blockFrame, createFrame, resultFrame } from '../src/tui/renderer.mjs';
 import { createScreenSession } from '../src/tui/session.mjs';
 
@@ -65,6 +65,16 @@ test('root and context renderers return line frames without printing', () => {
   assert.match(root, /\[root\]/);
   assert.match(root, /Branches 1 \(0\/1\) \| Notes 1 \(1\/1\) \| Flashcards 1/);
   assert.match(root, /\[branch\] Branch \(1\)/);
+});
+
+test('intro keeps the activity heatmap by stacking on narrow terminals', () => {
+  const db = dbFixture();
+  const narrow = introLines(db, { columns: 40 });
+  const wide = introLines(db, { columns: 120 });
+
+  assert.ok(narrow.some((line) => line.includes('Avg:')));
+  assert.ok(wide.some((line) => line.includes('Avg:')));
+  assert.ok(narrow.length > wide.length);
 });
 
 test('context renderer keeps done rows in list with muted done marker', () => {

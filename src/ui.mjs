@@ -2,7 +2,7 @@ import { createRequire } from 'node:module';
 import { ancestorsOf, itemById, pdfDisplayName, sortedRoots, statsForRoot, titleOf, typeLabel, webDisplayName } from './items.mjs';
 import { cursorFor, isDueFlashcard, listForContext, queueForContext } from './queue.mjs';
 import { activityStats, yearlyActivity } from './activity.mjs';
-import { ANSI, muted, yellow } from './tui/theme.mjs';
+import { ANSI, muted, visibleLength, yellow } from './tui/theme.mjs';
 import { centerAnsi, truncate } from './tui/layout.mjs';
 import { printLines } from './tui/renderer.mjs';
 import { screenSession } from './tui/session.mjs';
@@ -197,12 +197,12 @@ export function introLines(db, output = process.stdout) {
     '    Type help for commands.'
   ];
   const heat = heatmapLines(db);
-  const width = Math.max(...logo.map((line) => line.length));
+  const width = Math.max(...logo.map((line) => visibleLength(line)));
   const terminalWidth = output.columns ?? 0;
-  const heatWidth = 60;
+  const heatWidth = Math.max(...heat.map((line) => visibleLength(line)));
   const requiredWidth = width + 4 + heatWidth;
   if (terminalWidth > 0 && terminalWidth < requiredWidth) {
-    return logo;
+    return [...logo, '', ...heat];
   }
   const rows = Math.max(logo.length, heat.length);
   const lines = [];
