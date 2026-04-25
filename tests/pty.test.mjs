@@ -136,7 +136,7 @@ test('real PTY frame prompt handles Korean backspace, long input, escape, and re
 
     app.write('help\r');
     const helpResult = await waitFor(app.output, /edit\s+edit the current item[\s\S]*edit n\s+edit listed item n[\s\S]*Help 1\/\d+ - Enter: next \| q: close[\s\S]*help>/, 'paged help includes edit commands', 8000, cursor);
-    assert.equal((helpResult.output.match(/^Commands$/gm) ?? []).length, 1);
+    assert.equal((helpResult.output.match(/Help 1\/\d+ - Enter: next \| q: close/g) ?? []).length, 1);
     cursor = helpResult.end;
 
     app.write('q\r');
