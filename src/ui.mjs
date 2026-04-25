@@ -78,8 +78,11 @@ Commands
 
 Create
   new branch     create branches under any knowledge item (b, ㅠ)
+                 type> repeats until empty Enter or Esc; // still creates many
   new leaf       create leaves under any knowledge item (l, ㅣ)
+                 type> repeats until empty Enter or Esc; // still creates many
   new note       create notes under any knowledge item (n, ㅜ)
+                 type> repeats until empty Enter or Esc; // still creates many
   edit           edit the current item in a Save/Cancel window
   edit n         edit listed item n in a Save/Cancel window
                  basic uses Q:/A:, cloze uses {{c1::text}}

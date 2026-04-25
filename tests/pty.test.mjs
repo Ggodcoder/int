@@ -99,10 +99,13 @@ test('real PTY frame prompt handles Korean backspace, long input, escape, and re
     app.write('\x7f');
     await delay(100);
     app.write('자\r');
-    cursor = (await waitFor(app.output, /Created note: 한자[\s\S]*\[note\]\s+한자/, 'Korean backspace note command frame', 8000, cursor)).end;
+    await delay(300);
+    app.write('\x1b');
+    cursor = (await waitFor(app.output, /Created note: 한자[\s\S]*\[note\]\s+한자[\s\S]*int>/, 'Korean backspace note command frame', 8000, cursor)).end;
 
     app.write('1\r');
     cursor = (await waitFor(app.output, /\[note\][\s\S]*한자[\s\S]*empty[\s\S]*int>/, 'enter note for flashcard', 8000, cursor)).end;
+    await delay(200);
 
     app.write('basic\r');
     cursor = (await waitFor(app.output, /Q\?/, 'basic question prompt', 8000, cursor)).end;
@@ -118,7 +121,9 @@ test('real PTY frame prompt handles Korean backspace, long input, escape, and re
     cursor = (await waitFor(app.output, /type>/, 'new branch type prompt', 8000, cursor)).end;
     const longText = 'long-input-'.repeat(16);
     app.write(`${longText}\r`);
-    cursor = (await waitFor(app.output, /\[branch\][\s\S]*long-input-long-input/, 'long branch input in list', 8000, cursor)).end;
+    await delay(300);
+    app.write('\x1b');
+    cursor = (await waitFor(app.output, /\[branch\][\s\S]*long-input-long-input[\s\S]*int>/, 'long branch input in list', 8000, cursor)).end;
 
     app.write('2\r');
     cursor = (await waitFor(app.output, /\[branch\][\s\S]*long-input-long-input[\s\S]*empty[\s\S]*int>/, 'enter long branch', 8000, cursor)).end;

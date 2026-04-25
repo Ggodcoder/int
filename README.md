@@ -52,12 +52,14 @@ On launch, Int shows the logo, review heatmap, and root list.
 
 ## Create Items / 항목 생성
 
-Creation prompts use `type>`. Multiple items can be created at once with `//`.
+Creation prompts use `type>`. For branches, leaves, and notes, `type>` repeats so you can keep adding items in a flow. Press empty Enter or `Esc` to finish. Multiple items can still be created at once with `//`.
 
-생성 프롬프트는 `type>`를 사용합니다. `//`로 여러 항목을 한 번에 만들 수 있습니다.
+생성 프롬프트는 `type>`를 사용합니다. branch, leaf, note는 `type>`가 반복되어 흐름식으로 계속 추가할 수 있습니다. 빈 Enter 또는 `Esc`로 종료합니다. `//`로 여러 항목을 한 번에 만드는 방식도 그대로 지원합니다.
 
 ```text
 type> item 1 // item 2 // item 3
+type> item 4
+type>
 ```
 
 Commands / 명령어:
