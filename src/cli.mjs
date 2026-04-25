@@ -25,7 +25,7 @@ import { cursorFor, listForContext, queueForContext, rootQueueFor, selectedQueue
 import {
   contextLines,
   flashcardLines,
-  printHelp,
+  helpLines,
   queueProgressLines,
   rootsLines,
   studyFlashcardLines,
@@ -87,6 +87,50 @@ function printCommandRoots(db, messages = []) {
   const prefix = messageLines(messages);
   const lines = prefix.length > 0 ? [...prefix, '', ...rootsLines(db)] : rootsLines(db);
   screenSession.renderBlock(lines, { kind: 'command-roots', messages: prefix });
+}
+
+function helpPageSize(output = process.stdout) {
+  const rows = output.rows ?? 24;
+  return Math.max(8, rows - 3);
+}
+
+function helpPageLines(lines, pageIndex, pageSize) {
+  const totalPages = Math.max(1, Math.ceil(lines.length / pageSize));
+  const start = pageIndex * pageSize;
+  const page = lines.slice(start, start + pageSize);
+  return {
+    totalPages,
+    lines: [
+      ...page,
+      '',
+      `Help ${pageIndex + 1}/${totalPages} - Enter: next | q: close`
+    ]
+  };
+}
+
+async function showPagedHelp(rl) {
+  const lines = helpLines();
+  const pageSize = helpPageSize(process.stdout);
+  const previousFrame = screenSession.current();
+  let pageIndex = 0;
+
+  while (true) {
+    const page = helpPageLines(lines, pageIndex, pageSize);
+    screenSession.clear();
+    screenSession.renderLines(page.lines, { kind: 'help', transient: true, page: pageIndex + 1, totalPages: page.totalPages });
+    const action = await askCommand(rl, 'help> ');
+    const normalized = String(action ?? '').trim().toLowerCase();
+    if (normalized === 'q' || normalized === 'quit' || normalized === 'exit') break;
+    if (normalized === 'p' || normalized === 'prev' || normalized === '[') {
+      pageIndex = Math.max(0, pageIndex - 1);
+      continue;
+    }
+    if (pageIndex >= page.totalPages - 1) break;
+    pageIndex += 1;
+  }
+
+  screenSession.clear();
+  if (previousFrame) screenSession.render(previousFrame);
 }
 
 function pluralType(type) {
@@ -723,9 +767,8 @@ async function run() {
     if (normalized === 'quit' || normalized === 'exit' || normalized === 'q') break;
 
     if (normalized === 'help') {
-      restoreFrameOnBlank = screenSession.current();
-      screenSession.clear();
-      printHelp({ transient: true });
+      await showPagedHelp(rl);
+      needsPromptGap = false;
       continue;
     }
 

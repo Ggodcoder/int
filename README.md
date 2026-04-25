@@ -173,9 +173,9 @@ help           show help
 quit / exit/q  exit
 ```
 
-If help or an unknown command is shown, pressing blank Enter once restores the previous frame.
+Help is shown as pages sized to the current terminal height. Press Enter at `help>` to move to the next page, or `q` to close and return to the previous frame. If an unknown command is shown, pressing blank Enter once restores the previous frame.
 
-help 또는 알 수 없는 명령 안내가 표시된 상태에서 빈 Enter를 한 번 누르면 이전 화면 프레임으로 돌아갑니다.
+help는 현재 터미널 높이에 맞춘 페이지로 표시됩니다. `help>`에서 Enter를 누르면 다음 페이지로 이동하고, `q`를 누르면 닫고 이전 화면으로 돌아갑니다. 알 수 없는 명령 안내가 표시된 상태에서는 빈 Enter를 한 번 누르면 이전 화면 프레임으로 돌아갑니다.
 
 Lists show each item's type and child count.
 

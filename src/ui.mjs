@@ -119,7 +119,7 @@ Navigation
   open           open the current PDF/web item with the default app
   where          show the current context
   clear          clear screen and show the start view
-  blank Enter    restore the previous frame after help/unknown command
+  blank Enter    restore the previous frame after unknown command
 
 Settings
   set time       set the learning day boundary with 0000-2359

@@ -135,12 +135,12 @@ test('real PTY frame prompt handles Korean backspace, long input, escape, and re
     cursor = (await waitFor(app.output, /Reset: \[branch\] long-input-[\s\S]*\[web\] https:\/\/example\.com/, 'reset restores current done branch without touching child', 8000, cursor)).end;
 
     app.write('help\r');
-    const helpResult = await waitFor(app.output, /edit\s+edit the current item[\s\S]*edit n\s+edit listed item n[\s\S]*int>/, 'help includes edit commands', 8000, cursor);
+    const helpResult = await waitFor(app.output, /edit\s+edit the current item[\s\S]*edit n\s+edit listed item n[\s\S]*Help 1\/\d+ - Enter: next \| q: close[\s\S]*help>/, 'paged help includes edit commands', 8000, cursor);
     assert.equal((helpResult.output.match(/^Commands$/gm) ?? []).length, 1);
     cursor = helpResult.end;
 
-    app.write('\r');
-    cursor = (await waitFor(app.output, /\[branch\][\s\S]*long-input-long-input[\s\S]*\[web\] https:\/\/example\.com[\s\S]*int>/, 'blank enter restores previous frame after help', 8000, cursor)).end;
+    app.write('q\r');
+    cursor = (await waitFor(app.output, /\[branch\][\s\S]*long-input-long-input[\s\S]*\[web\] https:\/\/example\.com[\s\S]*int>/, 'help close restores previous frame', 8000, cursor)).end;
 
     app.write('wat\r');
     cursor = (await waitFor(app.output, /Unknown command\. Type help\.[\s\S]*int>/, 'unknown command transient frame', 8000, cursor)).end;
@@ -188,7 +188,9 @@ test('real PTY frame prompt handles Korean backspace, long input, escape, and re
     app.resize(60, 20);
     await delay(150);
     app.write('help\r');
-    await waitFor(app.output, /Commands[\s\S]*Licenses/, 'help after resize', 8000, cursor);
+    cursor = (await waitFor(app.output, /Help 1\/\d+ - Enter: next \| q: close[\s\S]*help>/, 'paged help after resize', 8000, cursor)).end;
+    app.write('q\r');
+    await delay(250);
 
     app.write('q\r');
     await delay(250);
