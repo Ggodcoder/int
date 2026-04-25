@@ -1,4 +1,4 @@
-import { createPrompt, useKeypress, useState, isEnterKey } from '@inquirer/core';
+import { createPrompt, useKeypress, useRef, useState, isEnterKey } from '@inquirer/core';
 
 export function splitTypeEntries(value) {
   return value
@@ -10,22 +10,25 @@ export function splitTypeEntries(value) {
 const exactLinePrompt = createPrompt((config, done) => {
   const [status, setStatus] = useState('idle');
   const [value, setValue] = useState('');
+  const latestValue = useRef('');
 
   useKeypress((key, rl) => {
     if (status !== 'idle') return;
     if (key.name === 'escape' || key.sequence === '\x1b') {
+      latestValue.current = 'canceled';
       setValue('canceled');
       setStatus('done');
       done(null);
       return;
     }
     if (isEnterKey(key)) {
-      const answer = rl.line.trim();
+      const answer = latestValue.current.trim();
       setValue(answer);
       setStatus('done');
       done(answer.length > 0 || config.keepEmpty ? answer : null);
       return;
     }
+    latestValue.current = rl.line;
     setValue(rl.line);
   });
 

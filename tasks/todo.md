@@ -292,3 +292,19 @@
   - `npm run smoke`
   - help output grep for `@inquirer/core`
   - `npm pack --dry-run`
+
+# Prompt Enter Value Hotfix
+
+- [x] Plan: fix the prompt wrapper losing typed text on Enter.
+- [x] Implement: keep the latest prompt line in a ref and submit that value instead of reading `rl.line` after Enter.
+- [x] Verify: run syntax checks and smoke test.
+- [x] Review: commit and push the hotfix.
+
+## Review
+
+- Root cause: by the time the Enter key handler ran, `rl.line` could already be cleared, so typed commands like `1` were submitted as empty.
+- The prompt now tracks the latest line value in `latestValue` and submits that stable value.
+- Verification passed:
+  - `node --check src\input.mjs`
+  - `node --check src\cli.mjs`
+  - `npm run smoke`
