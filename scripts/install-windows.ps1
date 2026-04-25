@@ -69,6 +69,16 @@ if ($LASTEXITCODE -ne 0) {
   throw "npm install failed with exit code $LASTEXITCODE"
 }
 
+Write-Step "Installing Playwright Chromium"
+$playwrightCli = Join-Path $npmRoot "int-cli\node_modules\playwright\cli.js"
+if (!(Test-Path -LiteralPath $playwrightCli)) {
+  throw "Playwright CLI was not found after install: $playwrightCli"
+}
+node $playwrightCli install chromium
+if ($LASTEXITCODE -ne 0) {
+  throw "playwright install chromium failed with exit code $LASTEXITCODE"
+}
+
 $env:Path = "$npmBin;$env:Path"
 $intCandidates = @(
   (Join-Path $npmBin "int.cmd"),

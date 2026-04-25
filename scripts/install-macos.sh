@@ -63,6 +63,14 @@ npm cache verify
 step "Installing Int CLI from GitHub"
 npm install -g github:Ggodcoder/int
 
+step "Installing Playwright Chromium"
+playwright_cli="$npm_root/int-cli/node_modules/playwright/cli.js"
+if [ ! -f "$playwright_cli" ]; then
+  printf '[int] Playwright CLI was not found after install: %s\n' "$playwright_cli" >&2
+  exit 1
+fi
+node "$playwright_cli" install chromium
+
 export PATH="$npm_bin:$PATH"
 hash -r 2>/dev/null || true
 
