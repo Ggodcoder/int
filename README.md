@@ -22,6 +22,14 @@ Windows에서는 설치/업데이트 스크립트를 권장합니다. 실행 중
 powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/Ggodcoder/int/main/scripts/install-windows.ps1 | iex"
 ```
 
+On macOS, use the installer/updater script. It removes stale global npm shims/folders, installs from GitHub, and runs a smoke check.
+
+macOS에서도 설치/업데이트 스크립트를 권장합니다. 꼬인 전역 npm shim/folder를 정리한 뒤 GitHub에서 설치하고 smoke check를 실행합니다.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Ggodcoder/int/main/scripts/install-macos.sh | bash
+```
+
 Manual npm install is also available:
 
 수동 npm 설치도 가능합니다.

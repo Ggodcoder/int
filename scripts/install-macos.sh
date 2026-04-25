@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+step() {
+  printf '[int] %s\n' "$1"
+}
+
+inside() {
+  case "$1" in
+    "$2"/*|"$2") return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+remove_if_inside() {
+  local target="$1"
+  local root="$2"
+  local label="$3"
+
+  if [ -z "$target" ] || { [ ! -e "$target" ] && [ ! -L "$target" ]; }; then
+    return 0
+  fi
+
+  local full_target
+  local full_root
+  full_target="$(cd "$(dirname "$target")" && pwd -P)/$(basename "$target")"
+  full_root="$(cd "$root" && pwd -P)"
+
+  if ! inside "$full_target" "$full_root"; then
+    printf '[int] refusing to remove %s outside %s: %s\n' "$label" "$full_root" "$full_target" >&2
+    exit 1
+  fi
+
+  step "Removing stale $label: $full_target"
+  rm -rf "$full_target"
+}
+
+if ! command -v npm >/dev/null 2>&1; then
+  printf '[int] npm is required but was not found.\n' >&2
+  exit 1
+fi
+
+npm_root="$(npm root -g)"
+npm_prefix="$(npm prefix -g)"
+
+step "Stopping running Int CLI processes"
+pkill -f 'int-cli/.*/src/cli\.mjs' 2>/dev/null || true
+pkill -f 'int-cli/src/cli\.mjs' 2>/dev/null || true
+
+step "Cleaning stale global package state"
+remove_if_inside "$npm_root/int-cli" "$npm_root" "int-cli package"
+remove_if_inside "$npm_prefix/bin/int" "$npm_prefix" "int executable"
+
+find "$npm_root" -maxdepth 1 \( -name '.int-cli-*' -o -name 'int-cli-*' \) -print0 2>/dev/null |
+  while IFS= read -r -d '' path; do
+    remove_if_inside "$path" "$npm_root" "npm temp folder"
+  done
+
+step "Verifying npm cache"
+npm cache verify
+
+step "Installing Int CLI from GitHub"
+npm install -g github:Ggodcoder/int
+
+step "Verifying Int CLI"
+int --smoke
+
+step "Done. Run int to start."
