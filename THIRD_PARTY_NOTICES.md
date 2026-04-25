@@ -21,7 +21,7 @@ This project uses the following third-party open-source packages.
 
 - Package: `playwright`
 - Version used: `1.59.1`
-- License: Apache License 2.0
+- License: Apache-2.0
 - Source: https://github.com/microsoft/playwright
 - License text: https://github.com/microsoft/playwright/blob/main/LICENSE
 

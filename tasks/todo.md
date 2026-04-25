@@ -327,3 +327,26 @@
   - `node --check src\cli.mjs`
   - `npm run smoke`
   - `npm run test:prompt`
+
+# Notice Automation
+
+- [x] Plan: add a dependency notice checker that prevents runtime/dev dependencies from drifting out of help and `THIRD_PARTY_NOTICES.md`.
+- [x] Implement: create a script based on `npm ls --json --depth=0` plus lockfile license metadata and wire it to `npm run check:notices`.
+- [x] Verify: run the new checker, syntax checks, smoke, prompt tests, and package dry run.
+- [x] Review: commit and push the verified changes.
+
+## Review
+
+- Added `scripts/check-notices.mjs`.
+- Added `npm run check:notices`.
+- Runtime dependencies must appear in both help license output and `THIRD_PARTY_NOTICES.md`.
+- Dev dependencies must appear in `THIRD_PARTY_NOTICES.md`.
+- The checker uses `npm ls --json --depth=0` for installed top-level dependencies and `package-lock.json` for license metadata.
+- Updated Playwright notice to use the SPDX value `Apache-2.0`, matching package metadata.
+- Verification passed:
+  - `node --check scripts\check-notices.mjs`
+  - `npm run check:notices`
+  - `node --check src\cli.mjs`
+  - `npm run smoke`
+  - `npm run test:prompt`
+  - `npm pack --dry-run`

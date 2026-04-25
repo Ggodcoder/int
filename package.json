@@ -18,6 +18,7 @@
   "scripts": {
     "start": "node ./src/cli.mjs",
     "smoke": "node ./src/cli.mjs --smoke",
+    "check:notices": "node ./scripts/check-notices.mjs",
     "test:prompt": "node --test tests/prompt.test.mjs",
     "postinstall": "playwright install chromium"
   },
