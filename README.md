@@ -14,9 +14,17 @@ Each root is an independent collection. Queue progress, flash card scheduling, a
 
 ## Run / 실행
 
-Install from GitHub with npm:
+On Windows, use the installer/updater script. It stops a running Int CLI, removes stale global npm shims/folders, installs from GitHub, and runs a smoke check.
 
-npm으로 GitHub에서 설치할 수 있습니다.
+Windows에서는 설치/업데이트 스크립트를 권장합니다. 실행 중인 Int CLI를 종료하고, 꼬인 전역 npm shim/folder를 정리한 뒤 GitHub에서 설치하고 smoke check를 실행합니다.
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/Ggodcoder/int/main/scripts/install-windows.ps1 | iex"
+```
+
+Manual npm install is also available:
+
+수동 npm 설치도 가능합니다.
 
 ```text
 npm install -g github:Ggodcoder/int
