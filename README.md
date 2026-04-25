@@ -53,6 +53,7 @@ new branch    b, ㅠ
 new leaf      l, ㅣ
 new note      n, ㅜ
 import web
+save link
 import pdf
 basic
 cloze
@@ -84,6 +85,15 @@ type> https://example.com
 The generated PDFs are stored under the app data imports folder.
 
 생성된 PDF는 앱 데이터의 imports 폴더 아래에 저장됩니다.
+
+Use `save link` inside a branch to save a URL-only web item without PDF capture.
+
+branch 안에서 `save link`를 입력하면 PDF 캡처 없이 URL만 web 항목으로 저장합니다.
+
+```text
+save link
+type> https://example.com
+```
 
 ## PDF Import / PDF 가져오기
 

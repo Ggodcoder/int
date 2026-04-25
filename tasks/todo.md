@@ -248,3 +248,24 @@
   - `npm run smoke`
   - help output grep for notice and alias lines
   - `npm pack --dry-run` includes `THIRD_PARTY_NOTICES.md`
+
+# Save Link Command
+
+- [x] Plan: reuse the web fallback data shape as an explicit `save link` command.
+- [x] Implement: add branch-only `save link` command with `type>` URL prompt and no PDF capture.
+- [x] Verify: run syntax checks, smoke test, help output check, package dry run, and link-only item shape check.
+- [x] Review: commit and push the verified changes.
+
+## Review
+
+- Added `save link` under branch contexts.
+- `save link` prompts with `type>`, normalizes `example.com` to `https://example.com/`, creates a `web` item, and keeps `pdfPath` null.
+- The command stays in the current branch, matching `import web` / `import pdf`.
+- README and help now list `save link`.
+- Verification passed:
+  - `node --check src\cli.mjs`
+  - `node --check src\ui.mjs`
+  - `npm run smoke`
+  - help output grep for `save link`
+  - link-only item data shape check
+  - `npm pack --dry-run`

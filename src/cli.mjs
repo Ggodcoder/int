@@ -184,6 +184,37 @@ async function importWeb(db, contextId) {
   }
 }
 
+async function saveLink(db, contextId) {
+  const context = itemById(db, contextId);
+  if (context?.type !== 'branch') {
+    printResult('Links can be saved inside a branch.');
+    return contextId;
+  }
+
+  const rawUrl = await askValue(rl, 'type>');
+  if (!rawUrl) return contextId;
+
+  let url;
+  try {
+    url = normalizeWebUrl(rawUrl);
+  } catch (error) {
+    printResult(error.message);
+    return contextId;
+  }
+
+  const item = makeWebImport(context, {
+    title: url,
+    sourceUrl: url,
+    pdfPath: null,
+    pdfFileName: null,
+    pageSize: null
+  });
+  db.items.push(item);
+  saveDb(db);
+  printResult(`Saved link: ${webDisplayName(item)}`);
+  return contextId;
+}
+
 async function importPdf(db, contextId) {
   const context = itemById(db, contextId);
   if (context?.type !== 'branch') {
@@ -712,6 +743,11 @@ async function run() {
     }
     if (normalized === 'import web') {
       contextId = await importWeb(db, contextId);
+      printContextWithGap(loadDb(), contextId);
+      continue;
+    }
+    if (normalized === 'save link') {
+      contextId = await saveLink(db, contextId);
       printContextWithGap(loadDb(), contextId);
       continue;
     }

@@ -84,6 +84,7 @@ Create
   new leaf       create leaves under any knowledge item (l, ㅣ)
   new note       create notes under any knowledge item (n, ㅜ)
   import web     import a URL as a PDF under the current branch
+  save link      save a URL-only web item under the current branch
   import pdf     import a PDF file under the current branch
   basic          create a basic flash card under the current note
   cloze          create a cloze flash card from the current note body
