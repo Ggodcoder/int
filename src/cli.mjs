@@ -180,11 +180,17 @@ async function createItem(db, contextId, type) {
     printResult(`Cannot create ${type} here.`);
     return { contextId, messages: [] };
   }
-  const titles = await askTypeEntriesRelay(rl);
-  const items = makeItems(context, type, titles);
+  const items = [];
+  await askTypeEntriesRelay(rl, {
+    onEntries(titles) {
+      const batch = makeItems(context, type, titles);
+      db.items.push(...batch);
+      items.push(...batch);
+      saveDb(db);
+      return contextLines(db, contextId);
+    }
+  });
   if (items.length === 0) return { contextId, messages: [] };
-  db.items.push(...items);
-  saveDb(db);
   return {
     contextId,
     messages: [items.length === 1 ? `Created ${type}: ${items[0].title}` : `Created ${items.length} ${pluralType(type)}.`]

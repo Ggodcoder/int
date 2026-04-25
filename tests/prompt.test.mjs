@@ -139,7 +139,10 @@ test('type relay prompt keeps collecting entries until empty enter', async () =>
   const { answer, events, getScreen, nextRender } = await render(typeEntriesRelayPrompt, {
     prompt: 'type>',
     framePrompt: true,
-    baseFrame
+    baseFrame,
+    onEntries(entries, allEntries) {
+      return ['body', ...allEntries.map((entry, index) => `  ${index + 1}. ${entry}`)];
+    }
   });
 
   events.type('note 1');
@@ -147,7 +150,7 @@ test('type relay prompt keeps collecting entries until empty enter', async () =>
   assert.equal(getScreen().endsWith('type> note 1'), true);
   events.keypress('enter');
   await nextRender();
-  assert.equal(getScreen().endsWith('type>'), true);
+  assert.match(getScreen(), /1\. note 1[\s\S]*type>$/);
   events.type('note 2 // note 3');
   events.keypress('enter');
   await nextRender();

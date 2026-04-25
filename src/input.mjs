@@ -57,6 +57,7 @@ export const exactLinePrompt = createPrompt((config, done) => {
 export const typeEntriesRelayPrompt = createPrompt((config, done) => {
   const [status, setStatus] = useState('idle');
   const [value, setValue] = useState('');
+  const [baseLines, setBaseLines] = useState(config.baseFrame?.lines ?? []);
   const latestValue = useRef('');
   const entries = useRef([]);
 
@@ -83,7 +84,10 @@ export const typeEntriesRelayPrompt = createPrompt((config, done) => {
         done(entries.current);
         return;
       }
-      entries.current = [...entries.current, ...splitTypeEntries(answer)];
+      const nextEntries = splitTypeEntries(answer);
+      entries.current = [...entries.current, ...nextEntries];
+      const nextBaseLines = config.onEntries?.(nextEntries, entries.current);
+      if (Array.isArray(nextBaseLines)) setBaseLines(nextBaseLines);
       syncLine(rl, '');
       return;
     }
@@ -98,7 +102,7 @@ export const typeEntriesRelayPrompt = createPrompt((config, done) => {
   });
 
   if (config.framePrompt && config.baseFrame) {
-    return promptContent(config.baseFrame, { prompt: config.prompt, value, accent: config.accent !== false });
+    return promptContent({ ...config.baseFrame, lines: baseLines }, { prompt: config.prompt, value, accent: config.accent !== false });
   }
   return renderLinePrompt({ prompt: config.prompt, value, accent: config.accent !== false });
 });
@@ -204,14 +208,14 @@ export async function askTypeEntries(rl) {
   return value ? splitTypeEntries(value) : [];
 }
 
-export async function askTypeEntriesRelay(rl) {
+export async function askTypeEntriesRelay(rl, { onEntries } = {}) {
   if (rl.input?.isTTY && typeof rl.input.setRawMode === 'function') {
     const currentFrame = shouldUseFramePrompt() ? screenSession.current() : null;
     const baseFrame = currentFrame?.meta?.transient ? null : currentFrame;
     if (baseFrame) clearScreen();
     try {
       return await typeEntriesRelayPrompt(
-        { prompt: 'type>', accent: true, framePrompt: Boolean(baseFrame), baseFrame },
+        { prompt: 'type>', accent: true, framePrompt: Boolean(baseFrame), baseFrame, onEntries },
         {
           input: process.stdin,
           output: process.stdout,
@@ -230,6 +234,7 @@ export async function askTypeEntriesRelay(rl) {
     const titles = await askTypeEntries(rl);
     if (titles.length === 0) break;
     entries.push(...titles);
+    onEntries?.(titles, entries);
   }
   return entries;
 }
