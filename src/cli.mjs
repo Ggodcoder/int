@@ -711,6 +711,7 @@ async function run() {
     const normalized = command.toLowerCase();
     if (!normalized) {
       if (restoreFrameOnBlank) {
+        screenSession.clear();
         screenSession.render(restoreFrameOnBlank);
         restoreFrameOnBlank = null;
         needsPromptGap = false;
