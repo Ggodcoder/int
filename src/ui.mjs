@@ -136,8 +136,8 @@ Licenses
 `.trim().split('\n');
 }
 
-export function printHelp() {
-  screenSession.renderLines(helpLines(), { kind: 'help' });
+export function printHelp(meta = {}) {
+  screenSession.renderLines(helpLines(), { kind: 'help', ...meta });
 }
 
 function heatCell(count, max) {

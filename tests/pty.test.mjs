@@ -135,7 +135,9 @@ test('real PTY frame prompt handles Korean backspace, long input, escape, and re
     cursor = (await waitFor(app.output, /Reset: \[branch\] long-input-[\s\S]*\[web\] https:\/\/example\.com/, 'reset restores current done branch without touching child', 8000, cursor)).end;
 
     app.write('help\r');
-    cursor = (await waitFor(app.output, /edit\s+edit the current item[\s\S]*edit n\s+edit listed item n/, 'help includes edit commands', 8000, cursor)).end;
+    const helpResult = await waitFor(app.output, /edit\s+edit the current item[\s\S]*edit n\s+edit listed item n[\s\S]*int>/, 'help includes edit commands', 8000, cursor);
+    assert.equal((helpResult.output.match(/^Commands$/gm) ?? []).length, 1);
+    cursor = helpResult.end;
 
     app.write('\r');
     cursor = (await waitFor(app.output, /\[branch\][\s\S]*long-input-long-input[\s\S]*\[web\] https:\/\/example\.com[\s\S]*int>/, 'blank enter restores previous frame after help', 8000, cursor)).end;

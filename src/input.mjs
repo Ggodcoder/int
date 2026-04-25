@@ -115,7 +115,8 @@ export function shouldUseFramePrompt(env = process.env) {
 }
 
 async function askPromptLine(prompt, { keepEmpty = false } = {}) {
-  const baseFrame = shouldUseFramePrompt() ? screenSession.current() : null;
+  const currentFrame = shouldUseFramePrompt() ? screenSession.current() : null;
+  const baseFrame = currentFrame?.meta?.transient ? null : currentFrame;
   if (baseFrame) clearScreen();
   try {
     return await exactLinePrompt(

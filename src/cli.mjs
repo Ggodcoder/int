@@ -723,7 +723,7 @@ async function run() {
 
     if (normalized === 'help') {
       restoreFrameOnBlank = screenSession.current();
-      printHelp();
+      printHelp({ transient: true });
       continue;
     }
 
