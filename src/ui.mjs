@@ -127,6 +127,7 @@ Settings
 
 Licenses
   int-cli        personal/local project
+  @inquirer/core 11.1.9 MIT License
   playwright 1.59.1 Apache-2.0 License
   ts-fsrs 5.3.2 MIT License
   see THIRD_PARTY_NOTICES.md for full notices

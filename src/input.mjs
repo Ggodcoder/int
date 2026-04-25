@@ -1,3 +1,5 @@
+import { createPrompt, useKeypress, useState, isEnterKey } from '@inquirer/core';
+
 export function splitTypeEntries(value) {
   return value
     .split('//')
@@ -5,67 +7,51 @@ export function splitTypeEntries(value) {
     .filter(Boolean);
 }
 
-function dropLastGrapheme(value) {
-  if (typeof Intl?.Segmenter === 'function') {
-    const segments = [...new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(value)];
-    return segments.slice(0, -1).map((segment) => segment.segment).join('');
-  }
-  return [...value].slice(0, -1).join('');
-}
+const exactLinePrompt = createPrompt((config, done) => {
+  const [status, setStatus] = useState('idle');
+  const [value, setValue] = useState('');
 
-function graphemes(value) {
-  if (typeof Intl?.Segmenter === 'function') {
-    return [...new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(value)].map((segment) => segment.segment);
-  }
-  return [...value];
-}
+  useKeypress((key, rl) => {
+    if (status !== 'idle') return;
+    if (key.name === 'escape' || key.sequence === '\x1b') {
+      setValue('canceled');
+      setStatus('done');
+      done(null);
+      return;
+    }
+    if (isEnterKey(key)) {
+      const answer = rl.line.trim();
+      setValue(answer);
+      setStatus('done');
+      done(answer.length > 0 || config.keepEmpty ? answer : null);
+      return;
+    }
+    setValue(rl.line);
+  });
 
-function charWidth(char) {
-  const code = char.codePointAt(0) ?? 0;
-  if (code === 0) return 0;
-  if (code < 32 || (code >= 0x7f && code < 0xa0)) return 0;
-  if (
-    code >= 0x1100 &&
-    (code <= 0x115f ||
-      code === 0x2329 ||
-      code === 0x232a ||
-      (code >= 0x2e80 && code <= 0xa4cf && code !== 0x303f) ||
-      (code >= 0xac00 && code <= 0xd7a3) ||
-      (code >= 0xf900 && code <= 0xfaff) ||
-      (code >= 0xfe10 && code <= 0xfe19) ||
-      (code >= 0xfe30 && code <= 0xfe6f) ||
-      (code >= 0xff00 && code <= 0xff60) ||
-      (code >= 0xffe0 && code <= 0xffe6) ||
-      (code >= 0x1f300 && code <= 0x1f64f) ||
-      (code >= 0x1f900 && code <= 0x1f9ff))
-  ) {
-    return 2;
-  }
-  return 1;
-}
+  return `${config.prompt}${value ? ` ${value}` : ''}`;
+});
 
-function textWidth(value) {
-  return graphemes(value).reduce((sum, char) => sum + charWidth(char), 0);
-}
-
-function fitTail(value, width) {
-  if (width <= 0) return '';
-  const chars = graphemes(value);
-  let output = '';
-  let used = 0;
-  for (let index = chars.length - 1; index >= 0; index -= 1) {
-    const char = chars[index];
-    const next = used + charWidth(char);
-    if (next > width) break;
-    output = `${char}${output}`;
-    used = next;
+async function askPromptLine(prompt, { keepEmpty = false } = {}) {
+  try {
+    return await exactLinePrompt(
+      { prompt, keepEmpty },
+      {
+        input: process.stdin,
+        output: process.stdout,
+        clearPromptOnDone: false
+      }
+    );
+  } catch (error) {
+    if (error?.name === 'CancelPromptError') return null;
+    if (error?.name === 'ExitPromptError') process.exit(130);
+    throw error;
   }
-  return output === value ? output : `…${fitTail(output, width - 1)}`;
 }
 
 export async function askValue(rl, prompt) {
   if (rl.input?.isTTY && typeof rl.input.setRawMode === 'function') {
-    return askRawLine(rl, prompt);
+    return askPromptLine(prompt);
   }
   const value = (await rl.question(`${prompt} `)).trim();
   console.log('');
@@ -74,79 +60,9 @@ export async function askValue(rl, prompt) {
 
 export async function askCommand(rl, prompt = 'int> ') {
   if (rl.input?.isTTY && typeof rl.input.setRawMode === 'function') {
-    return askRawLine(rl, prompt, { grayLine: true, keepEmpty: true });
+    return askPromptLine(prompt.trimEnd(), { keepEmpty: true });
   }
   return rl.question(prompt);
-}
-
-function askRawLine(rl, prompt, { grayLine = false, keepEmpty = false } = {}) {
-  return new Promise((resolve) => {
-    const input = rl.input;
-    const output = rl.output ?? process.stdout;
-    const wasRaw = input.isRaw;
-    const dataListeners = input.listeners('data');
-    let value = '';
-    const bg = '\x1b[48;5;236m';
-    const reset = '\x1b[0m';
-    const clearLine = '\x1b[2K';
-
-    const renderLine = () => {
-      const columns = output.columns ?? 0;
-      const renderedPrompt = grayLine ? prompt : `${prompt} `;
-      const maxValueWidth = columns > 0 ? Math.max(0, columns - textWidth(renderedPrompt) - 1) : Infinity;
-      const renderedValue = Number.isFinite(maxValueWidth) ? fitTail(value, maxValueWidth) : value;
-      output.write(`\r${clearLine}`);
-      if (!grayLine) {
-        output.write(`${renderedPrompt}${renderedValue}`);
-        return;
-      }
-      output.write(`${bg}${renderedPrompt}${renderedValue}${reset}`);
-    };
-
-    const finish = (result) => {
-      input.off('data', onData);
-      for (const listener of dataListeners) input.on('data', listener);
-      input.setRawMode(wasRaw);
-      output.write(`${reset}\n`);
-      rl.resume();
-      resolve(result);
-    };
-
-    const onData = (chunk) => {
-      const text = chunk.toString('utf8');
-      if (text === '\x03') {
-        input.setRawMode(wasRaw);
-        output.write(`${reset}\n`);
-        process.exit(130);
-      }
-      if (text === '\x1b') {
-        output.write(' canceled');
-        finish(null);
-        return;
-      }
-      if (text === '\r' || text === '\n') {
-        const trimmed = value.trim();
-        finish(trimmed.length > 0 || keepEmpty ? trimmed : null);
-        return;
-      }
-      if (text === '\x7f' || text === '\b') {
-        if (value.length > 0) {
-          value = dropLastGrapheme(value);
-          renderLine();
-        }
-        return;
-      }
-      value += text;
-      renderLine();
-    };
-
-    rl.pause();
-    for (const listener of dataListeners) input.off('data', listener);
-    renderLine();
-    input.setRawMode(true);
-    input.resume();
-    input.on('data', onData);
-  });
 }
 
 export async function askTypeEntries(rl) {

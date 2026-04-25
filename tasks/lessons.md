@@ -5,3 +5,4 @@
 - Before validating global CLI behavior, check `where.exe <command>` and `npm list -g --depth=0` so the patched checkout matches the command the user actually runs.
 - Web imports must not depend on `networkidle` alone. Dynamic pages can keep connections open, so use bounded waits and save a URL-only item when PDF capture fails.
 - Import commands that attach resources under the current branch must leave the user in that branch; do not auto-enter the newly created resource item.
+- Prompt rendering bugs around IME/backspace/Esc should be fixed at the prompt layer instead of adding more ANSI/raw-mode patches.

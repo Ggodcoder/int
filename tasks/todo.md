@@ -269,3 +269,26 @@
   - help output grep for `save link`
   - link-only item data shape check
   - `npm pack --dry-run`
+
+# Prompt Kit Migration
+
+- [x] Plan: replace the fragile custom command/type raw-line renderer with a prompt library while keeping existing prompt text.
+- [x] Implement: add `@inquirer/core`, route `int>` and `type>` style prompts through it, and guard canceled commands.
+- [x] Verify: run syntax checks, smoke test, help license check, and package dry run.
+- [x] Review: update notices/help, commit, and push.
+
+## Review
+
+- Replaced the custom command/type raw-line renderer with a small `@inquirer/core` prompt wrapper.
+- Removed the gray ANSI prompt-line background path that was causing terminal resize and line-wrap artifacts.
+- Kept prompt text as `int>` and `type>`.
+- Added a null guard so canceled command prompts no longer call `.trim()` on `null`.
+- Avoid creating a competing readline interface in TTY mode; raw flashcard review input still uses the existing focused handler.
+- Added `@inquirer/core` to help and `THIRD_PARTY_NOTICES.md`; updated Node engine to `>=20.12` to match Inquirer requirements.
+- Verification passed:
+  - `node --check src\input.mjs`
+  - `node --check src\cli.mjs`
+  - `node --check src\ui.mjs`
+  - `npm run smoke`
+  - help output grep for `@inquirer/core`
+  - `npm pack --dry-run`

@@ -31,7 +31,15 @@ import { openWithDefaultApp, targetForOpenableItem } from './openTarget.mjs';
 import { selectPdfFile } from './fileDialog.mjs';
 import { copyPdfIntoLibrary } from './pdfImport.mjs';
 
-const rl = createInterface({ input, output });
+const rl = input.isTTY
+  ? {
+      input,
+      output,
+      pause: () => input.pause(),
+      resume: () => input.resume(),
+      close: async () => {}
+    }
+  : createInterface({ input, output });
 const ROOT_QUEUE_CONTEXT = '__root_queue__';
 
 function printBlock(render) {
@@ -617,7 +625,13 @@ async function run() {
   while (true) {
     db = loadDb();
     if (needsPromptGap) console.log('');
-    const command = (await askCommand(rl)).trim();
+    const rawCommand = await askCommand(rl);
+    if (rawCommand === null) {
+      printResult('Canceled.');
+      needsPromptGap = false;
+      continue;
+    }
+    const command = rawCommand.trim();
     needsPromptGap = true;
     const normalized = command.toLowerCase();
     if (!normalized) continue;

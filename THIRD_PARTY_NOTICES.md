@@ -2,6 +2,13 @@
 
 This project uses the following third-party open-source packages.
 
+## Inquirer Core
+
+- Package: `@inquirer/core`
+- Version used: `11.1.9`
+- License: MIT License
+- Source: https://github.com/SBoudrias/Inquirer.js
+
 ## Playwright
 
 - Package: `playwright`
@@ -16,4 +23,3 @@ This project uses the following third-party open-source packages.
 - Version used: `5.3.2`
 - License: MIT License
 - Source: https://github.com/open-spaced-repetition/ts-fsrs
-
