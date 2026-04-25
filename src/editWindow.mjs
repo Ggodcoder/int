@@ -1,7 +1,6 @@
 import { createServer } from 'node:http';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { chromium } from 'playwright';
 
 function escapeHtml(value) {
   return String(value)
@@ -120,22 +119,84 @@ function readRequestBody(request) {
   });
 }
 
-function windowsAppBrowserPath() {
+function commandPath(command, platform = process.platform) {
+  const lookup = platform === 'win32' ? 'where.exe' : 'command';
+  const args = platform === 'win32' ? [command] : ['-v', command];
+  const result = spawnSync(lookup, args, { encoding: 'utf8', shell: platform !== 'win32' });
+  if (result.status !== 0) return null;
+  return result.stdout
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find(Boolean) ?? null;
+}
+
+function firstExisting(candidates) {
+  return candidates.find((candidate) => candidate && existsSync(candidate)) ?? null;
+}
+
+function windowsAppBrowserPath(env = process.env) {
+  const programFiles = env.PROGRAMFILES ?? 'C:\\Program Files';
+  const programFilesX86 = env['PROGRAMFILES(X86)'] ?? 'C:\\Program Files (x86)';
+  const localAppData = env.LOCALAPPDATA;
   const candidates = [
-    `${process.env.PROGRAMFILES ?? 'C:\\Program Files'}\\Google\\Chrome\\Application\\chrome.exe`,
-    `${process.env['PROGRAMFILES(X86)'] ?? 'C:\\Program Files (x86)'}\\Microsoft\\Edge\\Application\\msedge.exe`,
-    `${process.env.PROGRAMFILES ?? 'C:\\Program Files'}\\Microsoft\\Edge\\Application\\msedge.exe`
+    env.INT_EDIT_BROWSER,
+    `${programFiles}\\Google\\Chrome\\Application\\chrome.exe`,
+    `${programFilesX86}\\Google\\Chrome\\Application\\chrome.exe`,
+    localAppData && `${localAppData}\\Google\\Chrome\\Application\\chrome.exe`,
+    `${programFiles}\\Microsoft\\Edge\\Application\\msedge.exe`,
+    `${programFilesX86}\\Microsoft\\Edge\\Application\\msedge.exe`,
+    localAppData && `${localAppData}\\Microsoft\\Edge\\Application\\msedge.exe`,
+    `${programFiles}\\BraveSoftware\\Brave-Browser\\Application\\brave.exe`,
+    `${programFilesX86}\\BraveSoftware\\Brave-Browser\\Application\\brave.exe`,
+    localAppData && `${localAppData}\\BraveSoftware\\Brave-Browser\\Application\\brave.exe`,
+    commandPath('chrome.exe', 'win32'),
+    commandPath('msedge.exe', 'win32'),
+    commandPath('brave.exe', 'win32')
   ];
-  return candidates.find((candidate) => existsSync(candidate)) ?? chromium.executablePath();
+  return firstExisting(candidates);
+}
+
+function macAppBrowserPath(env = process.env) {
+  const home = env.HOME;
+  const candidates = [
+    env.INT_EDIT_BROWSER,
+    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+    home && `${home}/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`,
+    '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
+    home && `${home}/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge`,
+    '/Applications/Brave Browser.app/Contents/MacOS/Brave Browser',
+    home && `${home}/Applications/Brave Browser.app/Contents/MacOS/Brave Browser`,
+    commandPath('google-chrome', 'darwin'),
+    commandPath('microsoft-edge', 'darwin'),
+    commandPath('brave-browser', 'darwin')
+  ];
+  return firstExisting(candidates);
+}
+
+function linuxAppBrowserPath(env = process.env) {
+  const candidates = [
+    env.INT_EDIT_BROWSER,
+    commandPath('google-chrome', 'linux'),
+    commandPath('google-chrome-stable', 'linux'),
+    commandPath('microsoft-edge', 'linux'),
+    commandPath('brave-browser', 'linux'),
+    commandPath('chromium', 'linux'),
+    commandPath('chromium-browser', 'linux')
+  ];
+  return firstExisting(candidates);
 }
 
 function appBrowserPath(platform = process.platform) {
   if (platform === 'win32') return windowsAppBrowserPath();
-  return chromium.executablePath();
+  if (platform === 'darwin') return macAppBrowserPath();
+  return linuxAppBrowserPath();
 }
 
 async function openAppWindow(url) {
   const executablePath = appBrowserPath();
+  if (!executablePath) {
+    throw new Error('Edit window needs an installed Chrome, Edge, Brave, or INT_EDIT_BROWSER path. Playwright Chrome for Testing is intentionally not used for edit windows.');
+  }
   if (process.platform === 'win32') {
     const child = spawn('cmd', ['/c', 'start', '', executablePath, `--app=${url}`, '--window-size=900,620'], {
       detached: true,
@@ -242,5 +303,7 @@ export const editWindowInternals = {
   editPage,
   openAppWindow,
   appBrowserPath,
-  windowsAppBrowserPath
+  windowsAppBrowserPath,
+  macAppBrowserPath,
+  linuxAppBrowserPath
 };

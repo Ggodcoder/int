@@ -162,5 +162,7 @@ test('default edit launcher is app window based instead of system browser tab ba
 });
 
 test('edit launcher can select an app browser executable', () => {
-  assert.match(editWindowInternals.appBrowserPath(), /chrome|msedge/i);
+  const browserPath = editWindowInternals.appBrowserPath();
+  assert.match(browserPath, /chrome|msedge|brave/i);
+  assert.doesNotMatch(browserPath, /chromium-[0-9]|chrome-win|chrome-mac|chrome-linux/i);
 });
