@@ -1,4 +1,7 @@
 import { createPrompt, useKeypress, useRef, useState, isEnterKey } from '@inquirer/core';
+import { promptContent, renderLinePrompt, renderRevealPrompt } from './tui/input.mjs';
+import { clearScreen } from './tui/renderer.mjs';
+import { screenSession } from './tui/session.mjs';
 
 export function splitTypeEntries(value) {
   return value
@@ -11,6 +14,13 @@ export const exactLinePrompt = createPrompt((config, done) => {
   const [status, setStatus] = useState('idle');
   const [value, setValue] = useState('');
   const latestValue = useRef('');
+
+  const syncLine = (rl, next) => {
+    latestValue.current = next;
+    setValue(next);
+    rl.line = next;
+    rl.cursor = Array.from(next).length;
+  };
 
   useKeypress((key, rl) => {
     if (status !== 'idle') return;
@@ -28,11 +38,20 @@ export const exactLinePrompt = createPrompt((config, done) => {
       done(answer.length > 0 || config.keepEmpty ? answer : null);
       return;
     }
-    latestValue.current = rl.line;
-    setValue(rl.line);
+    if (key.name === 'backspace' || key.sequence === '\x7f' || key.sequence === '\b') {
+      syncLine(rl, Array.from(latestValue.current).slice(0, -1).join(''));
+      return;
+    }
+    if (key.ctrl || key.meta || key.name === 'tab' || key.name === 'delete') return;
+    if (key.sequence && !/[\r\n\x1b\x7f\b]/.test(key.sequence)) {
+      syncLine(rl, `${latestValue.current}${key.sequence}`);
+    }
   });
 
-  return `${config.prompt}${value ? ` ${value}` : ''}`;
+  if (config.framePrompt && config.baseFrame) {
+    return promptContent(config.baseFrame, { prompt: config.prompt, value, accent: config.accent !== false });
+  }
+  return renderLinePrompt({ prompt: config.prompt, value, accent: config.accent !== false });
 });
 
 export const studyGradePrompt = createPrompt((config, done) => {
@@ -58,7 +77,7 @@ export const studyGradePrompt = createPrompt((config, done) => {
     }
   });
 
-  return revealed ? 'rate>' : 'space>';
+  return renderLinePrompt({ prompt: renderRevealPrompt({ revealed, mode: 'queue' }) });
 });
 
 export const drillResultPrompt = createPrompt((config, done) => {
@@ -87,13 +106,20 @@ export const drillResultPrompt = createPrompt((config, done) => {
     }
   });
 
-  return revealed ? 'result>' : 'space>';
+  return renderLinePrompt({ prompt: renderRevealPrompt({ revealed, mode: 'drill' }) });
 });
 
+export function shouldUseFramePrompt(env = process.env) {
+  const value = String(env.INT_FRAME_PROMPT ?? '').trim().toLowerCase();
+  return !['0', 'false', 'off', 'classic'].includes(value);
+}
+
 async function askPromptLine(prompt, { keepEmpty = false } = {}) {
+  const baseFrame = shouldUseFramePrompt() ? screenSession.current() : null;
+  if (baseFrame) clearScreen();
   try {
     return await exactLinePrompt(
-      { prompt, keepEmpty },
+      { prompt, keepEmpty, accent: true, framePrompt: Boolean(baseFrame), baseFrame },
       {
         input: process.stdin,
         output: process.stdout,

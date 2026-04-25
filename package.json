@@ -20,6 +20,9 @@
     "smoke": "node ./src/cli.mjs --smoke",
     "check:notices": "node ./scripts/check-notices.mjs",
     "test:prompt": "node --test tests/prompt.test.mjs",
+    "test:pty": "node --test tests/pty.test.mjs",
+    "test:edit": "node --test tests/edit.test.mjs",
+    "test:ui": "node --test tests/ui.test.mjs",
     "postinstall": "playwright install chromium"
   },
   "dependencies": {
@@ -31,6 +34,7 @@
     "node": ">=20.12"
   },
   "devDependencies": {
-    "@inquirer/testing": "^3.3.5"
+    "@inquirer/testing": "^3.3.5",
+    "node-pty": "^1.1.0"
   }
 }

@@ -17,6 +17,14 @@ This project uses the following third-party open-source packages.
 - Scope: development/test dependency
 - Source: https://github.com/SBoudrias/Inquirer.js
 
+## node-pty
+
+- Package: `node-pty`
+- Version used: `1.1.0`
+- License: MIT
+- Scope: development/test dependency
+- Source: https://github.com/microsoft/node-pty
+
 ## Playwright
 
 - Package: `playwright`

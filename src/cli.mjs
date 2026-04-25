@@ -22,7 +22,15 @@ import {
 } from './items.mjs';
 import { makeFsrsCard, applyReview, applyReviewGrade } from './review.mjs';
 import { cursorFor, listForContext, queueForContext, rootQueueFor, selectedQueueItem, sessionFor, setCursor } from './queue.mjs';
-import { printContext, printFlashcard, printHelp, printQueueProgress, printRoots, printStartView, printStudyFlashcard } from './ui.mjs';
+import {
+  contextLines,
+  flashcardLines,
+  printHelp,
+  queueProgressLines,
+  rootsLines,
+  studyFlashcardLines,
+  startViewLines
+} from './ui.mjs';
 import { formatDayBoundary, normalizeDayBoundary, nowIso } from './time.mjs';
 import { runDrill } from './drill.mjs';
 import { recordActivity } from './activity.mjs';
@@ -30,6 +38,10 @@ import { normalizeWebUrl, renderWebPageToPdf } from './webImport.mjs';
 import { openWithDefaultApp, targetForOpenableItem } from './openTarget.mjs';
 import { selectPdfFile } from './fileDialog.mjs';
 import { copyPdfIntoLibrary } from './pdfImport.mjs';
+import { createFrame } from './tui/renderer.mjs';
+import { screenSession } from './tui/session.mjs';
+import { applyEditedText, editableTextFor, editTitleFor, resolveEditTarget } from './edit.mjs';
+import { openEditWindow } from './editWindow.mjs';
 
 const rl = input.isTTY
   ? {
@@ -42,26 +54,39 @@ const rl = input.isTTY
   : createInterface({ input, output });
 const ROOT_QUEUE_CONTEXT = '__root_queue__';
 
-function printBlock(render) {
-  console.log('');
-  render();
-  console.log('');
-}
-
 function printResult(message) {
-  printBlock(() => console.log(message));
+  screenSession.renderResult(message);
 }
 
 function printContextWithGap(db, contextId) {
-  printBlock(() => printContext(db, contextId));
+  screenSession.renderBlock(contextLines(db, contextId), { kind: 'context', contextId });
 }
 
-function printRootsWithGap(db) {
-  printBlock(() => printRoots(db));
+function queueItemFrameLines(db, contextId, current, total, messages = []) {
+  const prefix = messageLines(messages);
+  const body = [...queueProgressLines(current, total), '', ...contextLines(db, contextId)];
+  return prefix.length > 0 ? [...prefix, '', ...body] : body;
 }
 
-function printQueueProgressWithGap(current, total) {
-  printBlock(() => printQueueProgress(current, total));
+function studyFrameLines(item, { revealed = false, mode = 'queue', progress = null } = {}) {
+  const lines = studyFlashcardLines(item, { revealed, mode });
+  return progress ? [...queueProgressLines(progress.current, progress.total), '', ...lines] : lines;
+}
+
+function messageLines(messages) {
+  return messages.flatMap((message) => String(message).split('\n'));
+}
+
+function printCommandContext(db, contextId, messages = []) {
+  const prefix = messageLines(messages);
+  const lines = prefix.length > 0 ? [...prefix, '', ...contextLines(db, contextId)] : contextLines(db, contextId);
+  screenSession.renderBlock(lines, { kind: 'command-context', contextId, messages: prefix });
+}
+
+function printCommandRoots(db, messages = []) {
+  const prefix = messageLines(messages);
+  const lines = prefix.length > 0 ? [...prefix, '', ...rootsLines(db)] : rootsLines(db);
+  screenSession.renderBlock(lines, { kind: 'command-roots', messages: prefix });
 }
 
 function pluralType(type) {
@@ -80,12 +105,14 @@ async function newRoot(db) {
   db.roots.push(...roots);
   db.app.activeRootId = roots[0].id;
   saveDb(db);
-  printResult(roots.length === 1 ? `Created root: ${roots[0].title}` : `Created ${roots.length} roots.`);
-  return roots[0].id;
+  return {
+    contextId: roots[0].id,
+    messages: [roots.length === 1 ? `Created root: ${roots[0].title}` : `Created ${roots.length} roots.`]
+  };
 }
 
 async function setRoot(db) {
-  printRoots(db);
+  screenSession.render(createFrame(rootsLines(db), { kind: 'roots' }));
   if (db.roots.length === 0) return null;
   const choice = await askValue(rl, 'type>');
   if (!choice) return null;
@@ -107,58 +134,68 @@ async function createItem(db, contextId, type) {
   const context = itemById(db, contextId);
   if (!canCreate(context, type)) {
     printResult(`Cannot create ${type} here.`);
-    return contextId;
+    return { contextId, messages: [] };
   }
   const titles = await askTypeEntries(rl);
-  if (titles.length === 0) return contextId;
+  if (titles.length === 0) return { contextId, messages: [] };
   const items = makeItems(context, type, titles);
   db.items.push(...items);
   saveDb(db);
-  printResult(items.length === 1 ? `Created ${type}: ${items[0].title}` : `Created ${items.length} ${pluralType(type)}.`);
-  return contextId;
+  return {
+    contextId,
+    messages: [items.length === 1 ? `Created ${type}: ${items[0].title}` : `Created ${items.length} ${pluralType(type)}.`]
+  };
 }
 
 async function createBasic(db, contextId) {
   const context = itemById(db, contextId);
-  if (!canCreate(context, 'flashcard')) return printResult('Basic cards can be created inside a note.');
+  if (!canCreate(context, 'flashcard')) {
+    printResult('Basic cards can be created inside a note.');
+    return [];
+  }
   const question = await askValue(rl, 'Q?');
-  if (!question) return;
+  if (!question) return [];
   const answer = await askValue(rl, 'A?');
-  if (!answer) return;
+  if (!answer) return [];
   db.items.push(makeBasicCard(context, question, answer, makeFsrsCard()));
   saveDb(db);
-  printResult('Created basic flash card.');
+  return ['Created basic flash card.'];
 }
 
 async function createCloze(db, contextId) {
   const context = itemById(db, contextId);
-  if (!canCreate(context, 'flashcard')) return printResult('Cloze cards can be created inside a note.');
+  if (!canCreate(context, 'flashcard')) {
+    printResult('Cloze cards can be created inside a note.');
+    return [];
+  }
   const clozeText = await askValue(rl, 'clozing?');
-  if (!clozeText) return;
+  if (!clozeText) return [];
   const noteBody = context.body ?? context.title;
   const maskedText = maskText(noteBody, clozeText);
-  if (maskedText === noteBody) printResult('Text was not found; saving the original note body as the prompt.');
+  const messages = [];
+  if (maskedText === noteBody) messages.push('Text was not found; saving the original note body as the prompt.');
   db.items.push(makeClozeCard(context, clozeText, maskedText, makeFsrsCard()));
   saveDb(db);
-  printResult('Created cloze flash card.');
+  messages.push('Created cloze flash card.');
+  return messages;
 }
 
 async function importWeb(db, contextId) {
   const context = itemById(db, contextId);
   if (context?.type !== 'branch') {
     printResult('Web imports can be attached inside a branch.');
-    return contextId;
+    return { contextId, messages: [] };
   }
 
   const rawUrl = await askValue(rl, 'type>');
-  if (!rawUrl) return contextId;
+  if (!rawUrl) return { contextId, messages: [] };
 
   let url;
   try {
     url = normalizeWebUrl(rawUrl);
   } catch (error) {
     printResult(error.message);
-    return contextId;
+    return { contextId, messages: [] };
   }
 
   printResult('Importing web page as PDF...');
@@ -174,8 +211,7 @@ async function importWeb(db, contextId) {
     db.items.push(item);
     saveDb(db);
     const name = webDisplayName(item);
-    printResult(`Imported web: ${name}\nPDF: ${name}`);
-    return contextId;
+    return { contextId, messages: [`Imported web: ${name}`, `PDF: ${name}`] };
   } catch (error) {
     const item = makeWebImport(context, {
       title: url,
@@ -187,8 +223,7 @@ async function importWeb(db, contextId) {
     item.captureError = error.message;
     db.items.push(item);
     saveDb(db);
-    printResult(`Saved web link only: ${webDisplayName(item)}\nPDF: not captured (${error.message})`);
-    return contextId;
+    return { contextId, messages: [`Saved web link only: ${webDisplayName(item)}`, `PDF: not captured (${error.message})`] };
   }
 }
 
@@ -196,18 +231,18 @@ async function saveLink(db, contextId) {
   const context = itemById(db, contextId);
   if (context?.type !== 'branch') {
     printResult('Links can be saved inside a branch.');
-    return contextId;
+    return { contextId, messages: [] };
   }
 
   const rawUrl = await askValue(rl, 'type>');
-  if (!rawUrl) return contextId;
+  if (!rawUrl) return { contextId, messages: [] };
 
   let url;
   try {
     url = normalizeWebUrl(rawUrl);
   } catch (error) {
     printResult(error.message);
-    return contextId;
+    return { contextId, messages: [] };
   }
 
   const item = makeWebImport(context, {
@@ -219,15 +254,14 @@ async function saveLink(db, contextId) {
   });
   db.items.push(item);
   saveDb(db);
-  printResult(`Saved link: ${webDisplayName(item)}`);
-  return contextId;
+  return { contextId, messages: [`Saved link: ${webDisplayName(item)}`] };
 }
 
 async function importPdf(db, contextId) {
   const context = itemById(db, contextId);
   if (context?.type !== 'branch') {
     printResult('PDF imports can be attached inside a branch.');
-    return contextId;
+    return { contextId, messages: [] };
   }
 
   let selectedPath;
@@ -235,12 +269,11 @@ async function importPdf(db, contextId) {
     selectedPath = selectPdfFile();
   } catch (error) {
     printResult(`PDF selection failed: ${error.message}`);
-    return contextId;
+    return { contextId, messages: [] };
   }
 
   if (!selectedPath) {
-    printResult('Canceled.');
-    return contextId;
+    return { contextId, messages: ['Canceled.'] };
   }
 
   try {
@@ -248,11 +281,9 @@ async function importPdf(db, contextId) {
     const item = makePdfImport(context, result);
     db.items.push(item);
     saveDb(db);
-    printResult(`Imported PDF: ${pdfDisplayName(item)}`);
-    return contextId;
+    return { contextId, messages: [`Imported PDF: ${pdfDisplayName(item)}`] };
   } catch (error) {
-    printResult(`PDF import failed: ${error.message}`);
-    return contextId;
+    return { contextId, messages: [`PDF import failed: ${error.message}`] };
   }
 }
 
@@ -334,12 +365,11 @@ function removeDeletedIdsFromSessions(db, deletedIds) {
 
 function deleteFromQueue(db, rootId, contextId, spec) {
   const queue = listForContext(db, rootId, contextId);
-  if (queue.length === 0) return printResult('Queue is empty.');
+  if (queue.length === 0) return { ok: false, messages: ['Queue is empty.'] };
 
   const { indices, invalid } = parseDeleteSpec(spec, queue.length);
   if (indices.length === 0) {
-    printResult(invalid.length > 0 ? `Nothing deleted. Invalid index: ${invalid.join(', ')}` : 'Nothing deleted.');
-    return;
+    return { ok: false, messages: [invalid.length > 0 ? `Nothing deleted. Invalid index: ${invalid.join(', ')}` : 'Nothing deleted.'] };
   }
 
   const selectedIds = indices.map((index) => queue[index - 1].id);
@@ -351,18 +381,18 @@ function deleteFromQueue(db, rootId, contextId, spec) {
 
   const selectedText = indices.length === 1 ? '1 selected item' : `${indices.length} selected items`;
   const totalText = deletedIds.size === indices.length ? '' : ` (${deletedIds.size} total with children)`;
-  printResult(`Deleted ${selectedText}${totalText}.`);
-  if (invalid.length > 0) printResult(`Skipped invalid index: ${invalid.join(', ')}`);
+  const messages = [`Deleted ${selectedText}${totalText}.`];
+  if (invalid.length > 0) messages.push(`Skipped invalid index: ${invalid.join(', ')}`);
+  return { ok: true, messages };
 }
 
 function deleteFromRootList(db, spec) {
-  if (db.roots.length === 0) return printResult('Root list is empty.');
+  if (db.roots.length === 0) return { ok: false, messages: ['Root list is empty.'] };
 
   const roots = sortedRoots(db);
   const { indices, invalid } = parseDeleteSpec(spec, roots.length);
   if (indices.length === 0) {
-    printResult(invalid.length > 0 ? `Nothing deleted. Invalid index: ${invalid.join(', ')}` : 'Nothing deleted.');
-    return;
+    return { ok: false, messages: [invalid.length > 0 ? `Nothing deleted. Invalid index: ${invalid.join(', ')}` : 'Nothing deleted.'] };
   }
 
   const rootIds = new Set(indices.map((index) => roots[index - 1].id));
@@ -380,8 +410,9 @@ function deleteFromRootList(db, spec) {
 
   const selectedText = indices.length === 1 ? '1 selected root' : `${indices.length} selected roots`;
   const totalText = childCount > 0 ? ` (${childCount + indices.length} total with children)` : '';
-  printResult(`Deleted ${selectedText}${totalText}.`);
-  if (invalid.length > 0) printResult(`Skipped invalid index: ${invalid.join(', ')}`);
+  const messages = [`Deleted ${selectedText}${totalText}.`];
+  if (invalid.length > 0) messages.push(`Skipped invalid index: ${invalid.join(', ')}`);
+  return { ok: true, messages };
 }
 
 function parseSortSpec(command) {
@@ -451,12 +482,10 @@ function sortRootList(db, command) {
   const roots = sortedRoots(db);
   const result = moveListItem(roots, spec.source, spec.destination);
   if (!result.ok) {
-    printResult(result.message);
-    return true;
+    return { handled: true, ok: false, messages: [result.message] };
   }
   saveDb(db);
-  printResult('Sorted.');
-  return true;
+  return { handled: true, ok: true, messages: ['Sorted.'] };
 }
 
 function sortContextList(db, rootId, contextId, command) {
@@ -465,13 +494,11 @@ function sortContextList(db, rootId, contextId, command) {
   const list = listForContext(db, rootId, contextId);
   const result = moveListItem(list, spec.source, spec.destination);
   if (!result.ok) {
-    printResult(result.message);
-    return true;
+    return { handled: true, ok: false, messages: [result.message] };
   }
   setCursor(db, rootId, contextId, 0, list.length);
   saveDb(db);
-  printResult('Sorted.');
-  return true;
+  return { handled: true, ok: true, messages: ['Sorted.'] };
 }
 
 function moveQueue(db, rootId, contextId, delta) {
@@ -481,21 +508,44 @@ function moveQueue(db, rootId, contextId, delta) {
   setCursor(db, rootId, contextId, current + delta, queue.length);
   saveDb(db);
   const item = selectedQueueItem(db, rootId, contextId);
-  printBlock(() => {
-    console.log(`[${typeLabel(item)}] ${titleOf(item)}`);
-    if (item.type === 'flashcard') printFlashcard(item);
-  });
+  const lines = [`[${typeLabel(item)}] ${titleOf(item)}`];
+  if (item.type === 'flashcard') lines.push(...flashcardLines(item));
+  screenSession.renderBlock(lines, { kind: 'queue-item', itemId: item.id });
 }
 
-function excludeSelected(db, rootId, contextId) {
-  const item = selectedQueueItem(db, rootId, contextId);
-  if (!item) return printResult('Queue is empty.');
-  if (item.type === 'flashcard') return printResult('Flash cards cannot be marked done. Review them instead.');
+function excludeCurrentContextItem(db, contextId) {
+  const item = itemById(db, contextId);
+  if (!item || item.type === 'root') return { messages: ['Current item cannot be marked done.'] };
+  if (item.type === 'flashcard') return { messages: ['Flash cards cannot be marked done. Review them instead.'] };
   item.excluded = true;
   item.excludedAt = nowIso();
-  setCursor(db, rootId, contextId, 0, queueForContext(db, rootId, contextId).length);
   saveDb(db);
-  printResult(`Done: [${typeLabel(item)}] ${titleOf(item)}`);
+  return { messages: [`Done: [${typeLabel(item)}] ${titleOf(item)}`] };
+}
+
+function resetCurrentContextItem(db, contextId) {
+  const item = itemById(db, contextId);
+  if (!item || item.type === 'root') return { messages: ['Current item cannot be reset.'] };
+  if (item.type === 'flashcard') return { messages: ['Flash cards are not done items. Review them instead.'] };
+  if (!item.excluded) return { messages: ['Current item is not done.'] };
+  item.excluded = false;
+  delete item.excludedAt;
+  saveDb(db);
+  return { messages: [`Reset: [${typeLabel(item)}] ${titleOf(item)}`] };
+}
+
+async function editItem(db, rootId, contextId, command) {
+  const target = resolveEditTarget(db, rootId, contextId, command);
+  if (!target.ok) return { contextId, messages: [target.message] };
+  const text = editableTextFor(target.item);
+  if (text === null) return { contextId, messages: ['This item cannot be edited here.'] };
+  const result = await openEditWindow({ title: editTitleFor(target.item), text });
+  if (!result.saved) return { contextId, messages: ['Canceled.'] };
+  if (!applyEditedText(target.item, result.text)) {
+    return { contextId, messages: [`Edit failed: invalid ${typeLabel(target.item)} format.`] };
+  }
+  saveDb(db);
+  return { contextId, messages: [`Edited: [${typeLabel(target.item)}] ${titleOf(target.item)}`] };
 }
 
 function reviewSelected(db, rootId, contextId, passed) {
@@ -516,16 +566,29 @@ function reviewCurrent(db, contextId, passed) {
   printResult(passed ? 'Reviewed: pass' : 'Reviewed: fail');
 }
 
-async function studyFlashcard(db, item, { applySchedule = false } = {}) {
-  printStudyFlashcard(item, { revealed: false });
-  const grade = await askStudyGrade(rl, () => printStudyFlashcard(item, { revealed: true }));
-  if (!grade) return null;
+async function studyFlashcard(db, item, { applySchedule = false, progress = null } = {}) {
+  screenSession.renderLines(studyFrameLines(item, { revealed: false, progress }), {
+    kind: 'study-flashcard',
+    itemId: item.id,
+    revealed: false,
+    mode: 'queue',
+    progress
+  });
+  const grade = await askStudyGrade(rl, () => screenSession.renderLines(studyFrameLines(item, { revealed: true, progress }), {
+    kind: 'study-flashcard',
+    itemId: item.id,
+    revealed: true,
+    mode: 'queue',
+    progress
+  }));
+  if (!grade) return { grade: null, messages: [] };
+  const messages = [];
   if (applySchedule) {
     applyReviewGrade(item, grade);
     recordActivity(db);
-    printResult(`Reviewed: ${grade}`);
+    messages.push(`Reviewed: ${grade}`);
   }
-  return grade;
+  return { grade, messages };
 }
 
 function enterRootQueue(db, rootId, contextId, { resume = false } = {}) {
@@ -543,19 +606,27 @@ function enterRootQueue(db, rootId, contextId, { resume = false } = {}) {
   return { contextId: queue[index].id, entered: true };
 }
 
-async function showRootQueueItem(db, rootId, contextId) {
+async function showRootQueueItem(db, rootId, contextId, messages = []) {
   const item = itemById(db, contextId);
   if (!item) return contextId;
   const queue = rootQueueFor(db, rootId);
   const currentIndex = Math.max(0, queue.findIndex((candidate) => candidate.id === contextId));
-  printQueueProgressWithGap(currentIndex + 1, queue.length);
   if (item.type !== 'flashcard') {
-    printContext(db, contextId);
+    screenSession.renderBlock(queueItemFrameLines(db, contextId, currentIndex + 1, queue.length, messages), {
+      kind: 'queue-item',
+      contextId,
+      current: currentIndex + 1,
+      total: queue.length,
+      messages
+    });
     return contextId;
   }
 
-  const grade = await studyFlashcard(db, item, { applySchedule: true });
-  if (!grade) return contextId;
+  const review = await studyFlashcard(db, item, {
+    applySchedule: true,
+    progress: { current: currentIndex + 1, total: queue.length }
+  });
+  if (!review.grade) return contextId;
   saveDb(db);
 
   const nextDb = loadDb();
@@ -567,8 +638,7 @@ async function showRootQueueItem(db, rootId, contextId) {
     printResult('Root queue is empty.');
     return rootId;
   }
-  printContextWithGap(nextDb, nextItem.id);
-  return nextItem.id;
+  return showRootQueueItem(nextDb, rootId, nextItem.id, review.messages);
 }
 
 function moveRootQueue(db, rootId, delta) {
@@ -585,8 +655,8 @@ function moveRootQueue(db, rootId, delta) {
 
 function excludeCurrentQueueItem(db, rootId, contextId) {
   const item = itemById(db, contextId);
-  if (!item || item.type === 'root') return printResult('Current queue item cannot be marked done.');
-  if (item.type === 'flashcard') return printResult('Flash cards cannot be marked done. Review them instead.');
+  if (!item || item.type === 'root') return { nextId: null, messages: ['Current queue item cannot be marked done.'] };
+  if (item.type === 'flashcard') return { nextId: null, messages: ['Flash cards cannot be marked done. Review them instead.'] };
   const previousQueue = rootQueueFor(db, rootId);
   const previousIndex = Math.max(0, previousQueue.findIndex((candidate) => candidate.id === contextId));
   item.excluded = true;
@@ -594,8 +664,12 @@ function excludeCurrentQueueItem(db, rootId, contextId) {
   const nextQueue = rootQueueFor(db, rootId);
   setCursor(db, rootId, ROOT_QUEUE_CONTEXT, previousIndex, nextQueue.length);
   saveDb(db);
-  printResult(`Done: [${typeLabel(item)}] ${titleOf(item)}`);
-  return nextQueue[cursorFor(db, rootId, ROOT_QUEUE_CONTEXT, nextQueue.length)]?.id ?? null;
+  const messages = [`Done: [${typeLabel(item)}] ${titleOf(item)}`];
+  if (nextQueue.length === 0) messages.push('Root queue is empty.');
+  return {
+    nextId: nextQueue[cursorFor(db, rootId, ROOT_QUEUE_CONTEXT, nextQueue.length)]?.id ?? null,
+    messages
+  };
 }
 
 function parentIdFor(db, contextId) {
@@ -609,6 +683,7 @@ async function run() {
   let contextId = null;
   let needsPromptGap = false;
   let inRootQueue = false;
+  let restoreFrameOnBlank = null;
 
   if (process.argv.includes('--smoke')) {
     console.log(`db=${DB_FILE}`);
@@ -617,7 +692,7 @@ async function run() {
     return;
   }
 
-  printStartView(db);
+  screenSession.render(createFrame(startViewLines(db), { kind: 'start' }));
   if (db.roots.length > 0) {
     needsPromptGap = false;
   }
@@ -634,21 +709,30 @@ async function run() {
     const command = rawCommand.trim();
     needsPromptGap = true;
     const normalized = command.toLowerCase();
-    if (!normalized) continue;
+    if (!normalized) {
+      if (restoreFrameOnBlank) {
+        screenSession.render(restoreFrameOnBlank);
+        restoreFrameOnBlank = null;
+        needsPromptGap = false;
+      }
+      continue;
+    }
+    restoreFrameOnBlank = null;
     console.log('');
     if (normalized === 'quit' || normalized === 'exit' || normalized === 'q') break;
 
     if (normalized === 'help') {
+      restoreFrameOnBlank = screenSession.current();
       printHelp();
       continue;
     }
 
     if (normalized === 'clear') {
-      console.clear();
+      screenSession.clear();
       db = loadDb();
       contextId = null;
       inRootQueue = false;
-      printStartView(db);
+      screenSession.render(createFrame(startViewLines(db), { kind: 'start' }));
       needsPromptGap = false;
       continue;
     }
@@ -659,10 +743,10 @@ async function run() {
     }
 
     if (normalized === 'new root') {
-      const rootId = await newRoot(db);
-      if (rootId) contextId = rootId;
+      const result = await newRoot(db);
+      if (result?.contextId) contextId = result.contextId;
       inRootQueue = false;
-      printContextWithGap(loadDb(), contextId);
+      if (contextId) printCommandContext(loadDb(), contextId, result?.messages ?? []);
       continue;
     }
 
@@ -678,15 +762,16 @@ async function run() {
 
     if (!contextId) {
       if (normalized.startsWith('sort ')) {
-        if (sortRootList(db, command)) {
-          printRootsWithGap(loadDb());
+        const result = sortRootList(db, command);
+        if (result?.handled) {
+          printCommandRoots(loadDb(), result.messages);
           continue;
         }
       }
 
       if (normalized.startsWith('del ')) {
-        deleteFromRootList(db, command.slice(4).trim());
-        printRootsWithGap(loadDb());
+        const result = deleteFromRootList(db, command.slice(4).trim());
+        printCommandRoots(loadDb(), result.messages);
         continue;
       }
 
@@ -741,43 +826,49 @@ async function run() {
       continue;
     }
     if (normalized === 'new branch' || normalized === 'b' || normalized === 'ㅠ') {
-      contextId = await createItem(db, contextId, 'branch');
-      printContextWithGap(loadDb(), contextId);
+      const result = await createItem(db, contextId, 'branch');
+      contextId = result.contextId;
+      printCommandContext(loadDb(), contextId, result.messages);
       continue;
     }
     if (normalized === 'new leaf' || normalized === 'l' || normalized === 'ㅣ') {
-      contextId = await createItem(db, contextId, 'leaf');
-      printContextWithGap(loadDb(), contextId);
+      const result = await createItem(db, contextId, 'leaf');
+      contextId = result.contextId;
+      printCommandContext(loadDb(), contextId, result.messages);
       continue;
     }
     if (normalized === 'new note' || normalized === 'n' || normalized === 'ㅜ') {
-      contextId = await createItem(db, contextId, 'note');
-      printContextWithGap(loadDb(), contextId);
+      const result = await createItem(db, contextId, 'note');
+      contextId = result.contextId;
+      printCommandContext(loadDb(), contextId, result.messages);
       continue;
     }
     if (normalized === 'import web') {
-      contextId = await importWeb(db, contextId);
-      printContextWithGap(loadDb(), contextId);
+      const result = await importWeb(db, contextId);
+      contextId = result.contextId;
+      printCommandContext(loadDb(), contextId, result.messages);
       continue;
     }
     if (normalized === 'save link') {
-      contextId = await saveLink(db, contextId);
-      printContextWithGap(loadDb(), contextId);
+      const result = await saveLink(db, contextId);
+      contextId = result.contextId;
+      printCommandContext(loadDb(), contextId, result.messages);
       continue;
     }
     if (normalized === 'import pdf') {
-      contextId = await importPdf(db, contextId);
-      printContextWithGap(loadDb(), contextId);
+      const result = await importPdf(db, contextId);
+      contextId = result.contextId;
+      printCommandContext(loadDb(), contextId, result.messages);
       continue;
     }
     if (normalized === 'basic') {
-      await createBasic(db, contextId);
-      printContextWithGap(loadDb(), contextId);
+      const messages = await createBasic(db, contextId);
+      printCommandContext(loadDb(), contextId, messages);
       continue;
     }
     if (normalized === 'cloze') {
-      await createCloze(db, contextId);
-      printContextWithGap(loadDb(), contextId);
+      const messages = await createCloze(db, contextId);
+      printCommandContext(loadDb(), contextId, messages);
       continue;
     }
     if (normalized === ']' || normalized === 'next') {
@@ -806,24 +897,38 @@ async function run() {
     }
     if (normalized === 'd') {
       if (inRootQueue) {
-        const nextId = excludeCurrentQueueItem(db, rootId, contextId);
-        if (nextId) {
-          contextId = nextId;
-          printContextWithGap(loadDb(), contextId);
+        const result = excludeCurrentQueueItem(db, rootId, contextId);
+        if (result.nextId) {
+          contextId = result.nextId;
+          contextId = await showRootQueueItem(loadDb(), rootId, contextId, result.messages);
+        } else {
+          printResult(result.messages.join('\n'));
         }
       } else {
-        excludeSelected(db, rootId, contextId);
+        const result = excludeCurrentContextItem(db, contextId);
+        printCommandContext(loadDb(), contextId, result.messages);
       }
       continue;
     }
+    if (normalized === 'reset') {
+      const result = resetCurrentContextItem(db, contextId);
+      printCommandContext(loadDb(), contextId, result.messages);
+      continue;
+    }
+    if (normalized === 'edit' || /^edit\s+\d+$/i.test(command)) {
+      const result = await editItem(db, rootId, contextId, command);
+      printCommandContext(loadDb(), result.contextId, result.messages);
+      continue;
+    }
     if (normalized.startsWith('del ')) {
-      deleteFromQueue(db, rootId, contextId, command.slice(4).trim());
-      printContextWithGap(loadDb(), contextId);
+      const result = deleteFromQueue(db, rootId, contextId, command.slice(4).trim());
+      printCommandContext(loadDb(), contextId, result.messages);
       continue;
     }
     if (normalized.startsWith('sort ')) {
-      if (sortContextList(db, rootId, contextId, command)) {
-        printContextWithGap(loadDb(), contextId);
+      const result = sortContextList(db, rootId, contextId, command);
+      if (result?.handled) {
+        printCommandContext(loadDb(), contextId, result.messages);
         continue;
       }
     }
@@ -845,7 +950,8 @@ async function run() {
       continue;
     }
 
-    printResult('Unknown command. Type help.');
+    restoreFrameOnBlank = screenSession.current();
+    printResult('Unknown command. Type help.', { transient: true });
   }
 
   await rl.close();

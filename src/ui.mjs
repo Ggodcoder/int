@@ -2,19 +2,16 @@ import { createRequire } from 'node:module';
 import { ancestorsOf, itemById, pdfDisplayName, sortedRoots, statsForRoot, titleOf, typeLabel, webDisplayName } from './items.mjs';
 import { cursorFor, isDueFlashcard, listForContext, queueForContext } from './queue.mjs';
 import { activityStats, yearlyActivity } from './activity.mjs';
+import { ANSI, muted, yellow } from './tui/theme.mjs';
+import { centerAnsi, truncate } from './tui/layout.mjs';
+import { printLines } from './tui/renderer.mjs';
+import { screenSession } from './tui/session.mjs';
 
 const require = createRequire(import.meta.url);
 const { version: APP_VERSION } = require('../package.json');
 const DEVELOPER = 'Jay';
-const CYAN = '\x1b[36m';
-const YELLOW = '\x1b[33m';
-const RESET = '\x1b[0m';
-const PROMPT_BG = '\x1b[48;5;236m';
-const MUTED = '\x1b[90m';
-
-function truncate(value, length) {
-  return value.length > length ? `${value.slice(0, length - 1)}…` : value;
-}
+const CYAN = ANSI.cyan;
+const RESET = ANSI.reset;
 
 export function pathLabel(db, contextId, partLength = Infinity, highlightCurrent = false) {
   const path = ancestorsOf(db, contextId);
@@ -49,7 +46,7 @@ function withBaseColor(text, baseColor) {
 }
 
 function answerText(text, baseColor) {
-  return baseColor ? `${YELLOW}${text}${RESET}${baseColor}` : `${YELLOW}${text}${RESET}`;
+  return baseColor ? `${yellow(text)}${baseColor}` : yellow(text);
 }
 
 export function flashcardLine(item, { revealed = true, baseColor = '' } = {}) {
@@ -72,8 +69,8 @@ function listCountFor(db, item) {
   return listForContext(db, rootId, item.id).length;
 }
 
-export function printHelp() {
-  console.log(`
+export function helpLines() {
+  return `
 Commands
   new root       create root titles with type> title1 // title2
   set root       show roots, then choose by number or title
@@ -83,6 +80,9 @@ Create
   new branch     create branches under any knowledge item (b, ㅠ)
   new leaf       create leaves under any knowledge item (l, ㅣ)
   new note       create notes under any knowledge item (n, ㅜ)
+  edit           edit the current item in a Save/Cancel window
+  edit n         edit listed item n in a Save/Cancel window
+                 basic uses Q:/A:, cloze uses {{c1::text}}
   import web     import a URL as a PDF under the current branch
   save link      save a URL-only web item under the current branch
   import pdf     import a PDF file under the current branch
@@ -94,6 +94,7 @@ Queue
   ] / next       move to the next queue item
   [ / prev       move to the previous queue item (previous also works)
   d              mark the selected/current non-flashcard item done
+  reset          restore the current done item to the queue
   pass / fail    review the selected flash card outside que/drill
   1-4            rate revealed flash cards in que
 
@@ -118,6 +119,7 @@ Navigation
   open           open the current PDF/web item with the default app
   where          show the current context
   clear          clear screen and show the start view
+  blank Enter    restore the previous frame after help/unknown command
 
 Settings
   set time       set the learning day boundary with 0000-2359
@@ -131,7 +133,11 @@ Licenses
   playwright 1.59.1 Apache-2.0 License
   ts-fsrs 5.3.2 MIT License
   see THIRD_PARTY_NOTICES.md for full notices
-`.trim());
+`.trim().split('\n');
+}
+
+export function printHelp() {
+  screenSession.renderLines(helpLines(), { kind: 'help' });
 }
 
 function heatCell(count, max) {
@@ -154,15 +160,6 @@ function renderHeatCells(cells) {
     output += cell.char;
   }
   return `${output}${RESET}`;
-}
-
-function visibleLength(text) {
-  return text.replace(/\x1b\[[0-9;]*m/g, '').length;
-}
-
-function centerAnsi(text, width) {
-  const padding = Math.max(0, Math.floor((width - visibleLength(text)) / 2));
-  return `${' '.repeat(padding)}${text}`;
 }
 
 function heatmapLines(db) {
@@ -188,7 +185,7 @@ function heatmapLines(db) {
   ];
 }
 
-export function printIntro(db, output = process.stdout) {
+export function introLines(db, output = process.stdout) {
   const logo = [
     '    ██╗███╗   ██╗████████╗',
     '    ██║████╗  ██║╚══██╔══╝',
@@ -205,98 +202,119 @@ export function printIntro(db, output = process.stdout) {
   const heatWidth = 60;
   const requiredWidth = width + 4 + heatWidth;
   if (terminalWidth > 0 && terminalWidth < requiredWidth) {
-    console.log(logo.join('\n'));
-    return;
+    return logo;
   }
   const rows = Math.max(logo.length, heat.length);
+  const lines = [];
   for (let index = 0; index < rows; index += 1) {
     const left = logo[index] ?? '';
     const right = heat[index] ?? '';
-    console.log(`${left.padEnd(width + 4)}${right}`);
+    lines.push(`${left.padEnd(width + 4)}${right}`);
   }
+  return lines;
+}
+
+export function printIntro(db, output = process.stdout) {
+  printLines(introLines(db, output));
+}
+
+export function startViewLines(db, output = process.stdout) {
+  const lines = ['', ...introLines(db, output), ''];
+  if (db.roots.length === 0) {
+    return [...lines, 'Create your first root with "new root".', ''];
+  }
+  return [...lines, ...rootsLines(db), ''];
 }
 
 export function printStartView(db, output = process.stdout) {
-  console.log('');
-  printIntro(db, output);
-  console.log('');
+  printLines(startViewLines(db, output));
+}
+
+export function rootsLines(db) {
   if (db.roots.length === 0) {
-    console.log('Create your first root with "new root".');
-    console.log('');
-    return;
+    return ['No roots yet. Use "new root".'];
   }
-  printRoots(db);
-  console.log('');
+  return [
+    'Roots',
+    ...sortedRoots(db).map((root, index) => `  ${index + 1}. ${root.title} (${listCountFor(db, root)})`)
+  ];
 }
 
 export function printRoots(db) {
-  if (db.roots.length === 0) {
-    console.log('No roots yet. Use "new root".');
-    return;
-  }
-  console.log('Roots');
-  sortedRoots(db).forEach((root, index) => console.log(`  ${index + 1}. ${root.title} (${listCountFor(db, root)})`));
+  printLines(rootsLines(db));
+}
+
+export function flashcardLines(item) {
+  const due = item.fsrsCard?.due ? new Date(item.fsrsCard.due).toLocaleString() : 'now';
+  return [flashcardLine(item, { revealed: true }), `Due: ${due}`];
 }
 
 export function printFlashcard(item) {
-  console.log(flashcardLine(item, { revealed: true }));
-  const due = item.fsrsCard?.due ? new Date(item.fsrsCard.due).toLocaleString() : 'now';
-  console.log(`Due: ${due}`);
+  printLines(flashcardLines(item));
+}
+
+export function studyFlashcardLines(item, { revealed = false, mode = 'queue' } = {}) {
+  const lines = [`[${typeLabel(item)}] ${flashcardLine(item, { revealed })}`];
+  if (!revealed) lines.push('Press Space to reveal.');
+  else if (mode === 'drill') lines.push('Result: 1 Pass | 2 Fail');
+  else lines.push('Rate: 1 Again | 2 Hard | 3 Good | 4 Easy');
+  return lines;
 }
 
 export function printStudyFlashcard(item, { revealed = false, mode = 'queue' } = {}) {
-  console.log(`[${typeLabel(item)}] ${flashcardLine(item, { revealed })}`);
-  if (!revealed) console.log('Press Space to reveal.');
-  else if (mode === 'drill') console.log('Result: 1 Pass | 2 Fail');
-  else console.log('Rate: 1 Again | 2 Hard | 3 Good | 4 Easy');
+  screenSession.renderLines(studyFlashcardLines(item, { revealed, mode }), {
+    kind: 'study-flashcard',
+    itemId: item.id,
+    revealed,
+    mode
+  });
 }
 
-export function printContext(db, contextId) {
+export function contextLines(db, contextId) {
   const context = itemById(db, contextId);
   if (!context) {
-    console.log('No active context. Use "new root" or "set root".');
-    return;
+    return ['No active context. Use "new root" or "set root".'];
   }
   const rootId = context.type === 'root' ? context.id : context.rootId;
   const list = listForContext(db, rootId, contextId);
   const queue = queueForContext(db, rootId, contextId);
   cursorFor(db, rootId, contextId, queue.length);
 
-  console.log(`[${typeLabel(context)}] ${multilinePathLabel(db, contextId, Infinity, true)}`);
+  const lines = [`[${typeLabel(context)}] ${multilinePathLabel(db, contextId, Infinity, true)}`];
   if (context.type === 'root') {
     const stats = statsForRoot(db, context.id);
-    console.log('');
-    console.log(
+    lines.push('');
+    lines.push(
       `Branches ${stats.branches} (${stats.doneBranches}/${stats.branches}) | Notes ${stats.notes} (${stats.doneNotes}/${stats.notes}) | Flashcards ${stats.flashcards}`
     );
   }
 
   if (context.type === 'flashcard') {
-    return;
+    return lines;
   }
 
   if (context.type === 'web') {
     const name = webDisplayName(context);
-    console.log('');
+    lines.push('');
     if (context.pdfPath) {
-      console.log(`PDF: ${name}`);
+      lines.push(`PDF: ${name}`);
     } else {
-      console.log(`URL: ${name}`);
+      lines.push(`URL: ${name}`);
     }
-    return;
+    return lines;
   }
 
   if (context.type === 'pdf') {
-    console.log('');
-    console.log(`PDF: ${pdfDisplayName(context)}`);
-    return;
+    lines.push('');
+    lines.push(`PDF: ${pdfDisplayName(context)}`);
+    return lines;
   }
 
-  console.log('');
+  lines.push('');
 
   if (list.length === 0) {
-    console.log('  empty');
-    return;
+    lines.push('  empty');
+    return lines;
   }
 
   list.forEach((item, index) => {
@@ -304,12 +322,21 @@ export function printContext(db, contextId) {
     const title = item.type === 'flashcard' ? flashcardLine(item, { revealed: true }) : titleOf(item);
     const suffix = item.excluded ? ' <done>' : '';
     const line = `  ${index + 1}. ${duePrefix}[${typeLabel(item)}] ${title} (${listCountFor(db, item)})${suffix}`;
-    console.log(item.excluded ? `${MUTED}${line}${RESET}` : line);
+    lines.push(item.excluded ? muted(line) : line);
   });
+  return lines;
+}
+
+export function printContext(db, contextId) {
+  printLines(contextLines(db, contextId));
+}
+
+export function queueProgressLines(current, total) {
+  return [`${current}/${total}`];
 }
 
 export function printQueueProgress(current, total) {
-  console.log(`${current}/${total}`);
+  printLines(queueProgressLines(current, total));
 }
 
 export function pathPrompt(db, contextId) {
@@ -317,10 +344,7 @@ export function pathPrompt(db, contextId) {
 }
 
 export function promptLine(db, contextId, output = process.stdout) {
-  const prompt = `${pathPrompt(db, contextId)}> `;
-  const columns = output.columns ?? 0;
-  if (columns <= prompt.length) return `${PROMPT_BG}${prompt}`;
-  return `${PROMPT_BG}${' '.repeat(columns)}\r${prompt}`;
+  return `${pathPrompt(db, contextId)}> `;
 }
 
 export function resetStyle() {
