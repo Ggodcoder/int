@@ -19,8 +19,9 @@ function Remove-IfInside($Path, $AllowedRoot, $Label) {
   }
 
   $target = [System.IO.Path]::GetFullPath($Path)
-  $root = [System.IO.Path]::GetFullPath($AllowedRoot)
-  if (!$target.StartsWith($root, [System.StringComparison]::OrdinalIgnoreCase)) {
+  $root = [System.IO.Path]::GetFullPath($AllowedRoot).TrimEnd([System.IO.Path]::DirectorySeparatorChar, [System.IO.Path]::AltDirectorySeparatorChar)
+  $rootWithSeparator = "$root$([System.IO.Path]::DirectorySeparatorChar)"
+  if ($target -ne $root -and !$target.StartsWith($rootWithSeparator, [System.StringComparison]::OrdinalIgnoreCase)) {
     throw "Refusing to remove $Label outside $root`: $target"
   }
 
@@ -31,6 +32,7 @@ function Remove-IfInside($Path, $AllowedRoot, $Label) {
 Write-Step "Checking npm"
 $npmRoot = Command-Output "npm" @("root", "-g")
 $npmPrefix = Command-Output "npm" @("prefix", "-g")
+$npmBin = $npmPrefix
 
 Write-Step "Stopping running Int CLI processes"
 $intProcesses = Get-CimInstance Win32_Process |
@@ -67,8 +69,25 @@ if ($LASTEXITCODE -ne 0) {
   throw "npm install failed with exit code $LASTEXITCODE"
 }
 
+$env:Path = "$npmBin;$env:Path"
+$intCandidates = @(
+  (Join-Path $npmBin "int.cmd"),
+  (Join-Path $npmBin "int.ps1"),
+  (Join-Path $npmBin "int")
+)
+$intCommand = $intCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+if ([string]::IsNullOrWhiteSpace($intCommand)) {
+  $found = Get-Command int -ErrorAction SilentlyContinue | Select-Object -First 1
+  if ($found) {
+    $intCommand = $found.Source
+  }
+}
+if ([string]::IsNullOrWhiteSpace($intCommand)) {
+  throw "Install finished, but the int executable was not found. Expected one of: $($intCandidates -join ', '). npm prefix: $npmPrefix. npm root: $npmRoot. PATH: $env:Path"
+}
+
 Write-Step "Verifying Int CLI"
-int --smoke
+& $intCommand --smoke
 if ($LASTEXITCODE -ne 0) {
   throw "int --smoke failed with exit code $LASTEXITCODE"
 }

@@ -23,7 +23,7 @@
     "test:pty": "node --test tests/pty.test.mjs",
     "test:edit": "node --test tests/edit.test.mjs",
     "test:ui": "node --test tests/ui.test.mjs",
-    "postinstall": "playwright install chromium"
+    "postinstall": "node ./node_modules/playwright/cli.js install chromium"
   },
   "dependencies": {
     "@inquirer/core": "^11.1.9",
