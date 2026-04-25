@@ -18,6 +18,7 @@
   "scripts": {
     "start": "node ./src/cli.mjs",
     "smoke": "node ./src/cli.mjs --smoke",
+    "test:prompt": "node --test tests/prompt.test.mjs",
     "postinstall": "playwright install chromium"
   },
   "dependencies": {
@@ -27,5 +28,8 @@
   },
   "engines": {
     "node": ">=20.12"
+  },
+  "devDependencies": {
+    "@inquirer/testing": "^3.3.5"
   }
 }

@@ -7,7 +7,7 @@ export function splitTypeEntries(value) {
     .filter(Boolean);
 }
 
-const exactLinePrompt = createPrompt((config, done) => {
+export const exactLinePrompt = createPrompt((config, done) => {
   const [status, setStatus] = useState('idle');
   const [value, setValue] = useState('');
   const latestValue = useRef('');
@@ -33,6 +33,61 @@ const exactLinePrompt = createPrompt((config, done) => {
   });
 
   return `${config.prompt}${value ? ` ${value}` : ''}`;
+});
+
+export const studyGradePrompt = createPrompt((config, done) => {
+  const [status, setStatus] = useState('idle');
+  const [revealed, setRevealed] = useState(false);
+
+  useKeypress((key) => {
+    if (status !== 'idle') return;
+    if (key.name === 'escape' || key.sequence === '\x1b') {
+      setStatus('done');
+      done(null);
+      return;
+    }
+    if (!revealed && (key.name === 'space' || key.sequence === ' ')) {
+      config.onReveal?.();
+      setRevealed(true);
+      return;
+    }
+    if (revealed && /^[1-4]$/.test(key.name ?? key.sequence ?? '')) {
+      const grade = Number.parseInt(key.name ?? key.sequence, 10);
+      setStatus('done');
+      done(grade);
+    }
+  });
+
+  return revealed ? 'rate>' : 'space>';
+});
+
+export const drillResultPrompt = createPrompt((config, done) => {
+  const [status, setStatus] = useState('idle');
+  const [revealed, setRevealed] = useState(false);
+
+  useKeypress((key) => {
+    if (status !== 'idle') return;
+    if (key.name === 'escape' || key.sequence === '\x1b') {
+      setStatus('done');
+      done(null);
+      return;
+    }
+    if (!revealed && (key.name === 'space' || key.sequence === ' ')) {
+      config.onReveal?.();
+      setRevealed(true);
+      return;
+    }
+    if (revealed && key.name === '1') {
+      setStatus('done');
+      done('pass');
+    }
+    if (revealed && key.name === '2') {
+      setStatus('done');
+      done('fail');
+    }
+  });
+
+  return revealed ? 'result>' : 'space>';
 });
 
 async function askPromptLine(prompt, { keepEmpty = false } = {}) {
@@ -75,7 +130,13 @@ export async function askTypeEntries(rl) {
 
 export async function askStudyGrade(rl, onReveal) {
   if (rl.input?.isTTY && typeof rl.input.setRawMode === 'function') {
-    return askRawStudyGrade(rl, onReveal);
+    try {
+      return await studyGradePrompt({ onReveal }, { input: process.stdin, output: process.stdout, clearPromptOnDone: false });
+    } catch (error) {
+      if (error?.name === 'CancelPromptError') return null;
+      if (error?.name === 'ExitPromptError') process.exit(130);
+      throw error;
+    }
   }
   await rl.question('space> ');
   onReveal?.();
@@ -87,7 +148,13 @@ export async function askStudyGrade(rl, onReveal) {
 
 export async function askDrillResult(rl, onReveal) {
   if (rl.input?.isTTY && typeof rl.input.setRawMode === 'function') {
-    return askRawDrillResult(rl, onReveal);
+    try {
+      return await drillResultPrompt({ onReveal }, { input: process.stdin, output: process.stdout, clearPromptOnDone: false });
+    } catch (error) {
+      if (error?.name === 'CancelPromptError') return null;
+      if (error?.name === 'ExitPromptError') process.exit(130);
+      throw error;
+    }
   }
   await rl.question('space> ');
   onReveal?.();
@@ -96,103 +163,4 @@ export async function askDrillResult(rl, onReveal) {
   if (value === '1') return 'pass';
   if (value === '2') return 'fail';
   return null;
-}
-
-function askRawStudyGrade(rl, onReveal) {
-  return new Promise((resolve) => {
-    const input = rl.input;
-    const output = rl.output ?? process.stdout;
-    const wasRaw = input.isRaw;
-    const dataListeners = input.listeners('data');
-    let revealed = false;
-
-    const finish = (result) => {
-      input.off('data', onData);
-      for (const listener of dataListeners) input.on('data', listener);
-      input.setRawMode(wasRaw);
-      console.log('');
-      rl.resume();
-      resolve(result);
-    };
-
-    const onData = (chunk) => {
-      const text = chunk.toString('utf8');
-      if (text === '\x03') {
-        input.setRawMode(wasRaw);
-        console.log('');
-        process.exit(130);
-      }
-      if (text === '\x1b') {
-        output.write('canceled');
-        finish(null);
-        return;
-      }
-      if (!revealed && text === ' ') {
-        revealed = true;
-        console.log('');
-        onReveal?.();
-        output.write('rate> ');
-        return;
-      }
-      if (revealed && /^[1-4]$/.test(text)) {
-        finish(Number.parseInt(text, 10));
-      }
-    };
-
-    rl.pause();
-    for (const listener of dataListeners) input.off('data', listener);
-    output.write('space> ');
-    input.setRawMode(true);
-    input.resume();
-    input.on('data', onData);
-  });
-}
-
-function askRawDrillResult(rl, onReveal) {
-  return new Promise((resolve) => {
-    const input = rl.input;
-    const output = rl.output ?? process.stdout;
-    const wasRaw = input.isRaw;
-    const dataListeners = input.listeners('data');
-    let revealed = false;
-
-    const finish = (result) => {
-      input.off('data', onData);
-      for (const listener of dataListeners) input.on('data', listener);
-      input.setRawMode(wasRaw);
-      console.log('');
-      rl.resume();
-      resolve(result);
-    };
-
-    const onData = (chunk) => {
-      const text = chunk.toString('utf8');
-      if (text === '\x03') {
-        input.setRawMode(wasRaw);
-        console.log('');
-        process.exit(130);
-      }
-      if (text === '\x1b') {
-        output.write('canceled');
-        finish(null);
-        return;
-      }
-      if (!revealed && text === ' ') {
-        revealed = true;
-        console.log('');
-        onReveal?.();
-        output.write('result> ');
-        return;
-      }
-      if (revealed && text === '1') finish('pass');
-      if (revealed && text === '2') finish('fail');
-    };
-
-    rl.pause();
-    for (const listener of dataListeners) input.off('data', listener);
-    output.write('space> ');
-    input.setRawMode(true);
-    input.resume();
-    input.on('data', onData);
-  });
 }

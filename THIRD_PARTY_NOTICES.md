@@ -9,6 +9,14 @@ This project uses the following third-party open-source packages.
 - License: MIT License
 - Source: https://github.com/SBoudrias/Inquirer.js
 
+## Inquirer Testing
+
+- Package: `@inquirer/testing`
+- Version used: `3.3.5`
+- License: MIT License
+- Scope: development/test dependency
+- Source: https://github.com/SBoudrias/Inquirer.js
+
 ## Playwright
 
 - Package: `playwright`

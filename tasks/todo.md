@@ -308,3 +308,22 @@
   - `node --check src\input.mjs`
   - `node --check src\cli.mjs`
   - `npm run smoke`
+
+# Prompt Completion And Tests
+
+- [x] Plan: move flashcard reveal/rate prompts to the same prompt layer and add regression tests for prompt input.
+- [x] Implement: replace raw flashcard prompt handlers with `@inquirer/core` prompts and add `node:test` prompt coverage.
+- [x] Verify: run syntax checks, smoke, prompt tests, and package dry run.
+- [x] Review: commit and push the verified changes.
+
+## Review
+
+- Replaced the remaining raw `space>`, `rate>`, and `result>` handlers with `@inquirer/core` prompts.
+- Added prompt regression tests for numeric command input, Korean text input, Esc cancel, queue rating, and drill pass/fail.
+- Added `npm run test:prompt`.
+- Added `@inquirer/testing` as a dev dependency and documented it in `THIRD_PARTY_NOTICES.md`.
+- Verification passed:
+  - `node --check src\input.mjs`
+  - `node --check src\cli.mjs`
+  - `npm run smoke`
+  - `npm run test:prompt`
