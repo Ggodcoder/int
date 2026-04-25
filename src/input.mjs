@@ -49,9 +49,9 @@ export const exactLinePrompt = createPrompt((config, done) => {
   });
 
   if (config.framePrompt && config.baseFrame) {
-    return promptContent(config.baseFrame, { prompt: config.prompt, value, accent: config.accent !== false });
+    return promptContent(config.baseFrame, { prompt: config.prompt, value, accent: config.accent !== false, width: config.width });
   }
-  return renderLinePrompt({ prompt: config.prompt, value, accent: config.accent !== false });
+  return renderLinePrompt({ prompt: config.prompt, value, accent: config.accent !== false, width: config.width });
 });
 
 export const typeEntriesRelayPrompt = createPrompt((config, done) => {
@@ -102,9 +102,9 @@ export const typeEntriesRelayPrompt = createPrompt((config, done) => {
   });
 
   if (config.framePrompt && config.baseFrame) {
-    return promptContent({ ...config.baseFrame, lines: baseLines }, { prompt: config.prompt, value, accent: config.accent !== false });
+    return promptContent({ ...config.baseFrame, lines: baseLines }, { prompt: config.prompt, value, accent: config.accent !== false, width: config.width });
   }
-  return renderLinePrompt({ prompt: config.prompt, value, accent: config.accent !== false });
+  return renderLinePrompt({ prompt: config.prompt, value, accent: config.accent !== false, width: config.width });
 });
 
 export const studyGradePrompt = createPrompt((config, done) => {
@@ -173,7 +173,7 @@ async function askPromptLine(prompt, { keepEmpty = false } = {}) {
   if (baseFrame) clearScreen();
   try {
     return await exactLinePrompt(
-      { prompt, keepEmpty, accent: true, framePrompt: Boolean(baseFrame), baseFrame },
+      { prompt, keepEmpty, accent: true, framePrompt: Boolean(baseFrame), baseFrame, width: process.stdout.columns ?? 0 },
       {
         input: process.stdin,
         output: process.stdout,
@@ -215,7 +215,7 @@ export async function askTypeEntriesRelay(rl, { onEntries } = {}) {
     if (baseFrame) clearScreen();
     try {
       return await typeEntriesRelayPrompt(
-        { prompt: 'type>', accent: true, framePrompt: Boolean(baseFrame), baseFrame, onEntries },
+        { prompt: 'type>', accent: true, framePrompt: Boolean(baseFrame), baseFrame, onEntries, width: process.stdout.columns ?? 0 },
         {
           input: process.stdin,
           output: process.stdout,

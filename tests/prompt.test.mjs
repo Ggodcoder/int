@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { render } from '@inquirer/testing';
 import { drillResultPrompt, exactLinePrompt, shouldUseFramePrompt, studyGradePrompt, typeEntriesRelayPrompt } from '../src/input.mjs';
-import { promptContent, promptFrame, renderLinePrompt, renderRevealPrompt } from '../src/tui/input.mjs';
+import { promptContent, promptFrame, promptRows, renderLinePrompt, renderRevealPrompt } from '../src/tui/input.mjs';
 import { createFrame } from '../src/tui/renderer.mjs';
 
 test('line prompt submits typed numeric command', async () => {
@@ -89,6 +89,32 @@ test('frame prompt renders long input in the active frame payload', async () => 
   events.keypress('enter');
 
   assert.equal(await answer, longText);
+});
+
+test('frame prompt wraps long input inside the frame width', async () => {
+  const baseFrame = createFrame(['header'], { kind: 'context' });
+  const { answer, events, getScreen, nextRender } = await render(exactLinePrompt, {
+    prompt: 'int>',
+    keepEmpty: true,
+    framePrompt: true,
+    baseFrame,
+    width: 16
+  });
+
+  events.type('abcdefghijklmnop');
+  await nextRender();
+
+  assert.equal(getScreen(), 'header\nint> abcdefghijk\n     lmnop');
+  events.keypress('enter');
+  assert.equal(await answer, 'abcdefghijklmnop');
+});
+
+test('prompt rows wrap wide Korean text without relying on terminal auto-wrap', () => {
+  assert.deepEqual(promptRows({ prompt: 'type>', value: '가나다라마바사', accent: false, width: 12 }), [
+    'type> 가나다',
+    '      라마바',
+    '      사'
+  ]);
 });
 
 test('frame prompt is default with explicit classic fallbacks', () => {
