@@ -21,16 +21,18 @@ function run(command, args, options = {}) {
 }
 
 async function captureWindowsClipboardImage(outputPath) {
-  const script = `
+  const quotedPath = outputPath.replaceAll("'", "''");
+  const script = `& {
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
-$path = $args[0]
+$path = '${quotedPath}'
 if (-not [System.Windows.Forms.Clipboard]::ContainsImage()) { exit 2 }
 $image = [System.Windows.Forms.Clipboard]::GetImage()
 if ($null -eq $image) { exit 2 }
 $image.Save($path, [System.Drawing.Imaging.ImageFormat]::Png)
+}
 `;
-  return run('powershell.exe', ['-NoProfile', '-STA', '-Command', script, outputPath]);
+  return run('powershell.exe', ['-NoProfile', '-STA', '-Command', script]);
 }
 
 async function captureMacClipboardClass(outputPath, clipboardClass) {
