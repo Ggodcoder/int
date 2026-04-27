@@ -42,6 +42,8 @@ import { createFrame } from './tui/renderer.mjs';
 import { screenSession } from './tui/session.mjs';
 import { applyEditedText, editableTextFor, editTitleFor, resolveEditTarget } from './edit.mjs';
 import { openEditWindow } from './editWindow.mjs';
+import { attachClipboardImageToItem, canAttachImage, imagesOf } from './images.mjs';
+import { openImageWindow } from './imageWindow.mjs';
 
 const rl = input.isTTY
   ? {
@@ -598,6 +600,23 @@ async function editItem(db, rootId, contextId, command) {
   return { contextId, messages: [`Edited: [${typeLabel(target.item)}] ${titleOf(target.item)}`] };
 }
 
+async function attachClipboardImageIfPossible(db, contextId) {
+  const item = itemById(db, contextId);
+  if (!canAttachImage(item)) return { attached: false, messages: ['Images can be attached to branch, leaf, and note items.'] };
+  const result = await attachClipboardImageToItem(db, item);
+  if (result.attached) saveDb(db);
+  return { attached: result.attached, messages: [result.message] };
+}
+
+async function openImagesForContext(db, contextId) {
+  const item = itemById(db, contextId);
+  if (!canAttachImage(item)) return { messages: ['Images can be opened on branch, leaf, and note items.'] };
+  const images = imagesOf(item);
+  if (images.length === 0) return { messages: ['No images attached.'] };
+  await openImageWindow({ title: `Images [${typeLabel(item)}] ${titleOf(item)}`, images });
+  return { messages: [`Opened ${images.length} image${images.length === 1 ? '' : 's'}.`] };
+}
+
 function reviewSelected(db, rootId, contextId, passed) {
   const item = selectedQueueItem(db, rootId, contextId);
   if (!item || item.type !== 'flashcard') return printResult('Selected queue item is not a flash card.');
@@ -760,6 +779,14 @@ async function run() {
     needsPromptGap = true;
     const normalized = command.toLowerCase();
     if (!normalized) {
+      if (db.app.imageCaptureEnabled && contextId) {
+        const attached = await attachClipboardImageIfPossible(db, contextId);
+        if (attached.attached) {
+          printCommandContext(loadDb(), contextId, attached.messages);
+          needsPromptGap = false;
+          continue;
+        }
+      }
       if (restoreFrameOnBlank) {
         screenSession.clear();
         screenSession.render(restoreFrameOnBlank);
@@ -790,6 +817,27 @@ async function run() {
 
     if (normalized === 'set time') {
       await setLearningTime(db);
+      continue;
+    }
+
+    if (normalized === 'image on') {
+      db.app.imageCaptureEnabled = true;
+      saveDb(db);
+      const messages = ['Image capture on.'];
+      if (contextId) {
+        const attached = await attachClipboardImageIfPossible(db, contextId);
+        if (attached.attached) messages.push(...attached.messages);
+      }
+      if (contextId) printCommandContext(loadDb(), contextId, messages);
+      else printResult(messages.join('\n'));
+      continue;
+    }
+
+    if (normalized === 'image off') {
+      db.app.imageCaptureEnabled = false;
+      saveDb(db);
+      if (contextId) printCommandContext(loadDb(), contextId, ['Image capture off.']);
+      else printResult('Image capture off.');
       continue;
     }
 
@@ -855,6 +903,11 @@ async function run() {
     }
     if (normalized === 'open') {
       openCurrent(db, contextId);
+      continue;
+    }
+    if (normalized === 'open image') {
+      const result = await openImagesForContext(db, contextId);
+      printCommandContext(loadDb(), contextId, result.messages);
       continue;
     }
     if (normalized === 'home' || normalized === 'root') {

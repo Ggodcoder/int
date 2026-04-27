@@ -27,7 +27,8 @@ function dbFixture() {
         rootId: 'root-1',
         parentId: 'root-1',
         createdAt: '2026-04-01T00:01:00.000Z',
-        excluded: false
+        excluded: false,
+        images: [{ id: 'image-1', path: 'one.png', createdAt: '2026-04-01T00:01:30.000Z' }]
       },
       {
         id: 'note-1',
@@ -83,6 +84,7 @@ test('context renderer keeps done rows in list with muted done marker', () => {
 
   assert.match(branch, /\[note\] Done note \(1\) <done>/);
   assert.match(branch, /\x1b\[90m/);
+  assert.match(branch, /Images 1/);
 });
 
 test('queue progress shows remaining items from the current cursor', () => {

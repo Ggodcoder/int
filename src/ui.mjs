@@ -120,6 +120,10 @@ Navigation
   root / home    return to the current root
   back           move to the parent item
   open           open the current PDF/web item with the default app
+  image on       enable clipboard image capture for branch/leaf/note
+  image off      stop clipboard image capture
+  blank Enter    attach clipboard image when image capture is on
+  open image     open attached images in a GUI window
   where          show the current context
   clear          clear screen and show the start view
   blank Enter    restore the previous frame after unknown command
@@ -284,6 +288,10 @@ export function contextLines(db, contextId) {
   cursorFor(db, rootId, contextId, queue.length);
 
   const lines = [`[${typeLabel(context)}] ${multilinePathLabel(db, contextId, Infinity, true)}`];
+  if (Array.isArray(context.images) && context.images.length > 0) {
+    lines.push('');
+    lines.push(`Images ${context.images.length}`);
+  }
   if (context.type === 'root') {
     const stats = statsForRoot(db, context.id);
     lines.push('');
