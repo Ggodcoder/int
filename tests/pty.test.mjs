@@ -162,16 +162,16 @@ test('real PTY frame prompt handles Korean backspace, long input, escape, and re
     cursor = (await waitFor(app.output, /\[root\]\s+테스트루트[\s\S]*\[note\]\s+한자[\s\S]*\[branch\]/, 'return root after link flow', 8000, cursor)).end;
 
     app.write('que\r');
-    cursor = (await waitFor(app.output, /1\/3[\s\S]*\[flash:basic\][\s\S]*질문[\s\S]*\[\.\.\.\]/, 'queue flashcard hidden frame', 8000, cursor)).end;
+    cursor = (await waitFor(app.output, /Remaining: 3[\s\S]*\[flash:basic\][\s\S]*질문[\s\S]*\[\.\.\.\]/, 'queue flashcard hidden frame', 8000, cursor)).end;
 
     app.write(' ');
-    cursor = (await waitFor(app.output, /1\/3[\s\S]*\[flash:basic\][\s\S]*질문[\s\S]*답변[\s\S]*Rate: 1 Again/, 'queue flashcard reveal frame', 8000, cursor)).end;
+    cursor = (await waitFor(app.output, /Remaining: 3[\s\S]*\[flash:basic\][\s\S]*질문[\s\S]*답변[\s\S]*Rate: 1 Again/, 'queue flashcard reveal frame', 8000, cursor)).end;
 
     app.write('4');
-    cursor = (await waitFor(app.output, /Reviewed: 4[\s\S]*1\/2[\s\S]*\[note\][\s\S]*한자/, 'queue review advances to note frame', 8000, cursor)).end;
+    cursor = (await waitFor(app.output, /Reviewed: 4[\s\S]*Remaining: 2[\s\S]*\[note\][\s\S]*한자/, 'queue review advances to note frame', 8000, cursor)).end;
 
     app.write('d\r');
-    cursor = (await waitFor(app.output, /Done: \[note\] 한자[\s\S]*1\/1[\s\S]*\[branch\]/, 'queue done advances to restored branch', 8000, cursor)).end;
+    cursor = (await waitFor(app.output, /Done: \[note\] 한자[\s\S]*Remaining: 1[\s\S]*\[branch\]/, 'queue done advances to restored branch', 8000, cursor)).end;
 
     app.write('root\r');
     cursor = (await waitFor(app.output, /\[root\]\s+테스트루트[\s\S]*int>/, 'root before drill', 8000, cursor)).end;

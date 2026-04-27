@@ -335,7 +335,8 @@ export function printContext(db, contextId) {
 }
 
 export function queueProgressLines(current, total) {
-  return [`${current}/${total}`];
+  const remaining = Math.max(0, total - Math.max(0, current - 1));
+  return [`Remaining: ${remaining}`];
 }
 
 export function printQueueProgress(current, total) {

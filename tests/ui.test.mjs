@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { contextLines, introLines, rootsLines, startViewLines } from '../src/ui.mjs';
+import { contextLines, introLines, queueProgressLines, rootsLines, startViewLines } from '../src/ui.mjs';
 import { blockFrame, createFrame, resultFrame } from '../src/tui/renderer.mjs';
 import { createScreenSession } from '../src/tui/session.mjs';
 
@@ -83,6 +83,12 @@ test('context renderer keeps done rows in list with muted done marker', () => {
 
   assert.match(branch, /\[note\] Done note \(1\) <done>/);
   assert.match(branch, /\x1b\[90m/);
+});
+
+test('queue progress shows remaining items from the current cursor', () => {
+  assert.deepEqual(queueProgressLines(1, 5), ['Remaining: 5']);
+  assert.deepEqual(queueProgressLines(2, 5), ['Remaining: 4']);
+  assert.deepEqual(queueProgressLines(5, 5), ['Remaining: 1']);
 });
 
 test('frame renderer preserves lines and metadata', () => {
