@@ -123,10 +123,10 @@ del image n // m // ...
 ```
 
 `del image` deletes attached images from the current item. Deleting an image also removes image-occlusion cards made from that image.
-When an image-occlusion flash card appears in queue, drill, or a normal list entry, Int opens the image review window masked. Press Space in that window to reveal, then press `1`-`4` to grade and close it. In drill, `1` is Fail and `2`-`4` are Pass.
+When an image-occlusion flash card appears in queue or drill, Int opens the image review window masked. Press Space in that window to reveal, then grade it. Queue uses `1`-`4` FSRS ratings. Drill uses `1` Fail and `2` Pass. Opening an image-occlusion card from a normal list shows only the masked image without review controls.
 
 `del image`는 현재 항목에 첨부된 이미지를 삭제합니다. 이미지를 삭제하면 해당 이미지로 만든 이미지 오클루전 카드도 함께 삭제됩니다.
-이미지 오클루전 플래시카드가 queue, drill, 일반 list 진입에서 나타나면 마스킹된 이미지 리뷰 창이 자동으로 열립니다. 창에서 Space로 공개하고 `1`-`4`로 평가하면 창이 닫힙니다. drill에서는 `1`은 Fail, `2`-`4`는 Pass입니다.
+이미지 오클루전 플래시카드가 queue 또는 drill에서 나타나면 마스킹된 이미지 리뷰 창이 자동으로 열립니다. 창에서 Space로 공개한 뒤 평가합니다. queue는 `1`-`4` FSRS 평가를 사용하고, drill은 `1` Fail, `2` Pass를 사용합니다. 일반 list에서 이미지 오클루전 카드를 열면 리뷰 컨트롤 없이 마스킹된 이미지만 보여줍니다.
 
 ## Edit Items / 항목 수정
 

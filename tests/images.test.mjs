@@ -147,6 +147,79 @@ test('image occlusion review window resolves a 1-4 grade', async () => {
   rmSync(tempDir, { recursive: true, force: true });
 });
 
+test('image occlusion view mode has no reveal or rating controls', () => {
+  const html = imageWindowInternals.reviewPage({
+    title: 'View',
+    mode: 'view',
+    card: {
+      prompt: 'Image occlusion 1',
+      imagePath: 'one.png',
+      occlusion: { x: 0.1, y: 0.2, width: 0.3, height: 0.4 }
+    }
+  });
+
+  assert.doesNotMatch(html, /Press Space to reveal/);
+  assert.doesNotMatch(html, /1 Again|1 Fail/);
+  assert.match(html, /background: #f4cf4d/);
+});
+
+test('image occlusion drill window only accepts 1-2 and cancel resolves', async () => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'int-image-drill-'));
+  const imagePath = join(tempDir, 'one.png');
+  writeFileSync(imagePath, Buffer.from('png'));
+
+  let launchedUrl = null;
+  const review = openImageOcclusionReviewWindow({
+    title: 'Drill',
+    mode: 'drill',
+    card: {
+      prompt: 'Image occlusion 1',
+      imagePath,
+      occlusion: { x: 0.1, y: 0.2, width: 0.3, height: 0.4 }
+    },
+    async launcher(url) {
+      launchedUrl = url;
+      return { close: async () => {} };
+    }
+  });
+
+  while (!launchedUrl) await new Promise((resolve) => setTimeout(resolve, 5));
+  const invalid = await fetch(`${launchedUrl}review`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ grade: 4 })
+  });
+  assert.deepEqual(await invalid.json(), { ok: false });
+  const valid = await fetch(`${launchedUrl}review`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ grade: 2 })
+  });
+  assert.deepEqual(await valid.json(), { ok: true });
+  assert.deepEqual(await review, { grade: 2 });
+
+  let cancelUrl = null;
+  const canceled = openImageOcclusionReviewWindow({
+    title: 'Drill',
+    mode: 'drill',
+    card: {
+      prompt: 'Image occlusion 1',
+      imagePath,
+      occlusion: { x: 0.1, y: 0.2, width: 0.3, height: 0.4 }
+    },
+    async launcher(url) {
+      cancelUrl = url;
+      return { close: async () => {} };
+    }
+  });
+  while (!cancelUrl) await new Promise((resolve) => setTimeout(resolve, 5));
+  const canceledResponse = await fetch(`${cancelUrl}cancel`, { method: 'POST' });
+  assert.deepEqual(await canceledResponse.json(), { ok: true });
+  assert.deepEqual(await canceled, { grade: null });
+
+  rmSync(tempDir, { recursive: true, force: true });
+});
+
 test('image deletion removes selected attached files from an item', () => {
   const tempDir = mkdtempSync(join(tmpdir(), 'int-delete-image-'));
   const firstPath = join(tempDir, 'one.png');

@@ -778,15 +778,11 @@ async function studyFlashcard(db, item, { applySchedule = false, progress = null
 
 async function reviewImageOcclusionContext(db, item, { messagePrefix = '' } = {}) {
   const result = await openImageOcclusionReviewWindow({
-    title: `Review [${typeLabel(item)}] ${titleOf(item)}`,
+    title: `[${typeLabel(item)}] ${titleOf(item)}`,
     card: item,
-    mode: 'queue'
+    mode: 'view'
   });
-  if (!result.grade) return { messages: ['Review canceled.'] };
-  applyReviewGrade(item, result.grade);
-  recordActivity(db);
-  saveDb(db);
-  return { messages: [`${messagePrefix}Reviewed: ${result.grade}`] };
+  return { messages: result.grade ? [`${messagePrefix}Reviewed: ${result.grade}`] : [] };
 }
 
 function enterRootQueue(db, rootId, contextId, { resume = false } = {}) {

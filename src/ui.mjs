@@ -148,7 +148,7 @@ Queue
 Drill
   drill          round drill all flash cards in the current root
   1 / 2          pass/fail revealed flash cards in drill
-                 image occlusion drill uses 1-4; 1 fails, 2-4 pass
+                 image occlusion drill also uses 1 Fail / 2 Pass
 
 Delete
   del n          delete one listed item

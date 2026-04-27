@@ -236,10 +236,12 @@ function maskStyle(occlusion) {
 }
 
 function reviewPage({ title, card, mode }) {
+  const isView = mode === 'view';
   const isDrill = mode === 'drill';
   const ratingText = isDrill
-    ? '1 Fail | 2 Pass | 3 Pass | 4 Pass'
+    ? '1 Fail | 2 Pass'
     : '1 Again | 2 Hard | 3 Good | 4 Easy';
+  const maxGrade = isDrill ? 2 : 4;
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -296,7 +298,7 @@ function reviewPage({ title, card, mode }) {
       position: absolute;
       ${maskStyle(card.occlusion)}
       border: 2px solid #f4cf4d;
-      background: rgba(244, 207, 77, 0.9);
+      background: #f4cf4d;
     }
     body.revealed .mask {
       background: rgba(244, 207, 77, 0.12);
@@ -314,13 +316,17 @@ function reviewPage({ title, card, mode }) {
       <div class="mask"></div>
     </div>
   </main>
-  <footer>
+  ${isView ? '' : `<footer>
     <span id="hint" class="hint">Press Space to reveal.</span>
     <span id="rating" class="rating" hidden>${escapeHtml(ratingText)}</span>
-  </footer>
+  </footer>`}
   <script>
+    const mode = ${JSON.stringify(mode)};
+    const maxGrade = ${maxGrade};
+    let cancelSent = false;
     let revealed = false;
     async function rate(grade) {
+      cancelSent = true;
       await fetch('/review', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -329,12 +335,25 @@ function reviewPage({ title, card, mode }) {
       window.close();
       document.body.innerHTML = '<main style="padding:18px">Saved.</main>';
     }
+    function cancel() {
+      if (cancelSent) return;
+      cancelSent = true;
+      try {
+        navigator.sendBeacon('/cancel', new Blob(['{}'], { type: 'application/json' }));
+      } catch {
+        fetch('/cancel', { method: 'POST', keepalive: true }).catch(() => {});
+      }
+    }
+    window.addEventListener('pagehide', cancel);
+    window.addEventListener('beforeunload', cancel);
     document.addEventListener('keydown', (event) => {
       if (event.key === 'Escape') {
         event.preventDefault();
-        fetch('/cancel', { method: 'POST' }).finally(() => window.close());
+        cancel();
+        window.close();
         return;
       }
+      if (mode === 'view') return;
       if (event.code === 'Space' || event.key === ' ') {
         event.preventDefault();
         revealed = true;
@@ -343,7 +362,7 @@ function reviewPage({ title, card, mode }) {
         document.getElementById('rating').hidden = false;
         return;
       }
-      if (revealed && /^[1-4]$/.test(event.key)) {
+      if (revealed && /^[1-4]$/.test(event.key) && Number.parseInt(event.key, 10) <= maxGrade) {
         event.preventDefault();
         rate(Number.parseInt(event.key, 10));
       }
@@ -447,9 +466,11 @@ export async function openImageOcclusionReviewWindow({ title = 'Image occlusion'
           const body = await readRequestBody(request);
           const parsed = body ? JSON.parse(body) : {};
           const grade = Number.parseInt(parsed.grade, 10);
+          const maxGrade = mode === 'drill' ? 2 : 4;
+          const valid = grade >= 1 && grade <= maxGrade;
           response.writeHead(200, { 'content-type': 'application/json' });
-          response.end(JSON.stringify({ ok: grade >= 1 && grade <= 4 }));
-          await settle({ grade: grade >= 1 && grade <= 4 ? grade : null });
+          response.end(JSON.stringify({ ok: valid }));
+          if (valid) await settle({ grade });
           return;
         }
 
