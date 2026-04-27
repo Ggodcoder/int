@@ -75,6 +75,44 @@ function listCountFor(db, item) {
   return listForContext(db, rootId, item.id).length;
 }
 
+const LIST_SECTIONS = [
+  ['branch', 'Branches'],
+  ['leaf', 'Leaves'],
+  ['note', 'Notes'],
+  ['web', 'Web'],
+  ['pdf', 'PDFs'],
+  ['flashcard', 'Flashcards']
+];
+
+function listSectionFor(item) {
+  if (item.type === 'flashcard') return 'flashcard';
+  return item.type;
+}
+
+function listItemLine(db, item, index) {
+  const duePrefix = !item.excluded && isDueFlashcard(item, db.app.dayBoundary) ? '*' : ' ';
+  const title = item.type === 'flashcard' ? flashcardLine(item, { revealed: true }) : titleOf(item);
+  const suffix = item.excluded ? ' <done>' : '';
+  const line = `  ${index + 1}. ${duePrefix}[${typeLabel(item)}] ${title} (${listCountFor(db, item)})${suffix}`;
+  return item.excluded ? muted(line) : line;
+}
+
+function groupedListLines(db, list) {
+  const lines = [];
+  for (const [section, label] of LIST_SECTIONS) {
+    const entries = list
+      .map((item, index) => ({ item, index }))
+      .filter((entry) => listSectionFor(entry.item) === section);
+    if (entries.length === 0) continue;
+    if (lines.length > 0) lines.push('');
+    lines.push(label);
+    for (const entry of entries) {
+      lines.push(listItemLine(db, entry.item, entry.index));
+    }
+  }
+  return lines;
+}
+
 export function helpLines() {
   return `
 Commands
@@ -110,6 +148,7 @@ Queue
 Drill
   drill          round drill all flash cards in the current root
   1 / 2          pass/fail revealed flash cards in drill
+                 image occlusion drill uses 1-4; 1 fails, 2-4 pass
 
 Delete
   del n          delete one listed item
@@ -340,13 +379,7 @@ export function contextLines(db, contextId) {
     return lines;
   }
 
-  list.forEach((item, index) => {
-    const duePrefix = !item.excluded && isDueFlashcard(item, db.app.dayBoundary) ? '*' : ' ';
-    const title = item.type === 'flashcard' ? flashcardLine(item, { revealed: true }) : titleOf(item);
-    const suffix = item.excluded ? ' <done>' : '';
-    const line = `  ${index + 1}. ${duePrefix}[${typeLabel(item)}] ${title} (${listCountFor(db, item)})${suffix}`;
-    lines.push(item.excluded ? muted(line) : line);
-  });
+  lines.push(...groupedListLines(db, list));
   return lines;
 }
 

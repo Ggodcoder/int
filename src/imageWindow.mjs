@@ -227,6 +227,133 @@ function imagePage({ title, images }) {
 </html>`;
 }
 
+function maskStyle(occlusion) {
+  const x = Math.max(0, Math.min(1, Number(occlusion?.x) || 0)) * 100;
+  const y = Math.max(0, Math.min(1, Number(occlusion?.y) || 0)) * 100;
+  const width = Math.max(0, Math.min(1, Number(occlusion?.width) || 0)) * 100;
+  const height = Math.max(0, Math.min(1, Number(occlusion?.height) || 0)) * 100;
+  return `left:${x}%;top:${y}%;width:${width}%;height:${height}%;`;
+}
+
+function reviewPage({ title, card, mode }) {
+  const isDrill = mode === 'drill';
+  const ratingText = isDrill
+    ? '1 Fail | 2 Pass | 3 Pass | 4 Pass'
+    : '1 Again | 2 Hard | 3 Good | 4 Easy';
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${escapeHtml(title)}</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #181818;
+      color: #e5e5e5;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+    }
+    header, footer {
+      padding: 12px 16px;
+      border-color: #343434;
+      background: #181818;
+      color: #cfcfcf;
+    }
+    header { border-bottom: 1px solid #343434; }
+    footer {
+      border-top: 1px solid #343434;
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    main {
+      padding: 18px;
+      display: grid;
+      place-items: center;
+      overflow: auto;
+    }
+    .wrap {
+      position: relative;
+      width: fit-content;
+      max-width: 100%;
+      line-height: 0;
+      background: #0f0f0f;
+    }
+    img {
+      max-width: 100%;
+      max-height: calc(100vh - 150px);
+      border: 1px solid #3a3a3a;
+      user-select: none;
+      -webkit-user-drag: none;
+    }
+    .mask {
+      position: absolute;
+      ${maskStyle(card.occlusion)}
+      border: 2px solid #f4cf4d;
+      background: rgba(244, 207, 77, 0.9);
+    }
+    body.revealed .mask {
+      background: rgba(244, 207, 77, 0.12);
+      border-style: dashed;
+    }
+    .hint { color: #a7a7a7; }
+    .rating { color: #f4cf4d; }
+  </style>
+</head>
+<body>
+  <header>${escapeHtml(title)}</header>
+  <main>
+    <div class="wrap">
+      <img src="/review-image" alt="${escapeHtml(card.prompt ?? 'Image occlusion')}">
+      <div class="mask"></div>
+    </div>
+  </main>
+  <footer>
+    <span id="hint" class="hint">Press Space to reveal.</span>
+    <span id="rating" class="rating" hidden>${escapeHtml(ratingText)}</span>
+  </footer>
+  <script>
+    let revealed = false;
+    async function rate(grade) {
+      await fetch('/review', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ grade })
+      });
+      window.close();
+      document.body.innerHTML = '<main style="padding:18px">Saved.</main>';
+    }
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        fetch('/cancel', { method: 'POST' }).finally(() => window.close());
+        return;
+      }
+      if (event.code === 'Space' || event.key === ' ') {
+        event.preventDefault();
+        revealed = true;
+        document.body.classList.add('revealed');
+        document.getElementById('hint').textContent = 'Revealed.';
+        document.getElementById('rating').hidden = false;
+        return;
+      }
+      if (revealed && /^[1-4]$/.test(event.key)) {
+        event.preventDefault();
+        rate(Number.parseInt(event.key, 10));
+      }
+    });
+    window.focus();
+  </script>
+</body>
+</html>`;
+}
+
 export async function openImageWindow({ title = 'Images', images = [], launcher = editWindowInternals.openAppWindow, onOcclusions = async () => ({ created: 0 }) } = {}) {
   if (images.length === 0) throw new Error('No images attached.');
   return new Promise((resolve, reject) => {
@@ -283,4 +410,81 @@ export async function openImageWindow({ title = 'Images', images = [], launcher 
   });
 }
 
-export const imageWindowInternals = { imagePage, readRequestBody };
+export async function openImageOcclusionReviewWindow({ title = 'Image occlusion', card, mode = 'queue', launcher = editWindowInternals.openAppWindow } = {}) {
+  if (!card?.imagePath) throw new Error('Image occlusion card has no image path.');
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    let windowHandle = null;
+    const settle = async (result) => {
+      if (settled) return;
+      settled = true;
+      resolve(result);
+      server.close();
+      try {
+        await windowHandle?.close?.();
+      } catch {}
+    };
+    const server = createServer(async (request, response) => {
+      try {
+        if (request.method === 'GET' && request.url === '/') {
+          response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+          response.end(reviewPage({ title, card, mode }));
+          return;
+        }
+
+        if (request.method === 'GET' && request.url === '/review-image') {
+          if (!existsSync(card.imagePath)) {
+            response.writeHead(404);
+            response.end('Not found');
+            return;
+          }
+          response.writeHead(200, { 'content-type': 'image/png' });
+          createReadStream(card.imagePath).pipe(response);
+          return;
+        }
+
+        if (request.method === 'POST' && request.url === '/review') {
+          const body = await readRequestBody(request);
+          const parsed = body ? JSON.parse(body) : {};
+          const grade = Number.parseInt(parsed.grade, 10);
+          response.writeHead(200, { 'content-type': 'application/json' });
+          response.end(JSON.stringify({ ok: grade >= 1 && grade <= 4 }));
+          await settle({ grade: grade >= 1 && grade <= 4 ? grade : null });
+          return;
+        }
+
+        if (request.method === 'POST' && request.url === '/cancel') {
+          response.writeHead(200, { 'content-type': 'application/json' });
+          response.end(JSON.stringify({ ok: true }));
+          await settle({ grade: null });
+          return;
+        }
+
+        response.writeHead(404);
+        response.end('Not found');
+      } catch (error) {
+        if (!settled) {
+          settled = true;
+          reject(error);
+        }
+        server.close();
+      }
+    });
+
+    server.on('error', reject);
+    server.listen(0, '127.0.0.1', async () => {
+      const { port } = server.address();
+      try {
+        windowHandle = await launcher(`http://127.0.0.1:${port}/`);
+      } catch (error) {
+        if (!settled) {
+          settled = true;
+          reject(error);
+        }
+        server.close();
+      }
+    });
+  });
+}
+
+export const imageWindowInternals = { imagePage, readRequestBody, reviewPage };

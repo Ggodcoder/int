@@ -5,6 +5,7 @@ import { askDrillResult } from './input.mjs';
 import { studyFlashcardLines } from './ui.mjs';
 import { recordActivity } from './activity.mjs';
 import { screenSession } from './tui/session.mjs';
+import { openImageOcclusionReviewWindow } from './imageWindow.mjs';
 
 function startOrResumeDrill(db, rootId) {
   const state = db.app.drill[rootId];
@@ -39,6 +40,15 @@ async function studyDrillCard(rl, db, state) {
     return null;
   }
   const card = itemById(db, state.cardIds[state.index]);
+  if (card?.cardType === 'image-occlusion') {
+    const result = await openImageOcclusionReviewWindow({
+      title: `Drill round ${state.round} (${state.index + 1}/${state.cardIds.length})`,
+      card,
+      mode: 'drill'
+    });
+    if (!result.grade) return null;
+    return result.grade === 1 ? 'fail' : 'pass';
+  }
   screenSession.renderLines(drillCardLines(card, state, { revealed: false }), {
     kind: 'drill-card',
     round: state.round,

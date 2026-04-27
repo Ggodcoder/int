@@ -4,7 +4,7 @@ import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { attachClipboardImageToItem, canAttachImage, deleteImagesFromItem, imagesOf } from '../src/images.mjs';
-import { imageWindowInternals, openImageWindow } from '../src/imageWindow.mjs';
+import { imageWindowInternals, openImageOcclusionReviewWindow, openImageWindow } from '../src/imageWindow.mjs';
 
 function dbFixture() {
   return {
@@ -113,6 +113,37 @@ test('image window posts occlusion masks to the save callback', async () => {
   });
   assert.deepEqual(await response.json(), { ok: true, created: 1 });
   assert.deepEqual(savedOcclusions, [{ imageIndex: 0, x: 0.1, y: 0.2, width: 0.3, height: 0.4 }]);
+  rmSync(tempDir, { recursive: true, force: true });
+});
+
+test('image occlusion review window resolves a 1-4 grade', async () => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'int-image-review-'));
+  const imagePath = join(tempDir, 'one.png');
+  writeFileSync(imagePath, Buffer.from('png'));
+
+  let launchedUrl = null;
+  const review = openImageOcclusionReviewWindow({
+    title: 'Review',
+    card: {
+      prompt: 'Image occlusion 1',
+      imagePath,
+      occlusion: { x: 0.1, y: 0.2, width: 0.3, height: 0.4 }
+    },
+    async launcher(url) {
+      launchedUrl = url;
+      return { close: async () => {} };
+    }
+  });
+
+  while (!launchedUrl) await new Promise((resolve) => setTimeout(resolve, 5));
+  const response = await fetch(`${launchedUrl}review`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ grade: 4 })
+  });
+
+  assert.deepEqual(await response.json(), { ok: true });
+  assert.deepEqual(await review, { grade: 4 });
   rmSync(tempDir, { recursive: true, force: true });
 });
 

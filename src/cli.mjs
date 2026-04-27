@@ -45,7 +45,7 @@ import { screenSession } from './tui/session.mjs';
 import { applyEditedText, editableTextFor, editTitleFor, resolveEditTarget } from './edit.mjs';
 import { openEditWindow } from './editWindow.mjs';
 import { attachClipboardImageToItem, canAttachImage, deleteImageFiles, deleteImagesFromItem, imagesOf } from './images.mjs';
-import { openImageWindow } from './imageWindow.mjs';
+import { openImageOcclusionReviewWindow, openImageWindow } from './imageWindow.mjs';
 
 const rl = input.isTTY
   ? {
@@ -735,6 +735,23 @@ function reviewCurrent(db, contextId, passed) {
 }
 
 async function studyFlashcard(db, item, { applySchedule = false, progress = null } = {}) {
+  if (item.cardType === 'image-occlusion') {
+    const result = await openImageOcclusionReviewWindow({
+      title: progress ? `Queue (${progress.current}/${progress.total})` : 'Image occlusion',
+      card: item,
+      mode: 'queue'
+    });
+    const grade = result.grade;
+    if (!grade) return { grade: null, messages: [] };
+    const messages = [];
+    if (applySchedule) {
+      applyReviewGrade(item, grade);
+      recordActivity(db);
+      messages.push(`Reviewed: ${grade}`);
+    }
+    return { grade, messages };
+  }
+
   screenSession.renderLines(studyFrameLines(item, { revealed: false, progress }), {
     kind: 'study-flashcard',
     itemId: item.id,
@@ -757,6 +774,19 @@ async function studyFlashcard(db, item, { applySchedule = false, progress = null
     messages.push(`Reviewed: ${grade}`);
   }
   return { grade, messages };
+}
+
+async function reviewImageOcclusionContext(db, item, { messagePrefix = '' } = {}) {
+  const result = await openImageOcclusionReviewWindow({
+    title: `Review [${typeLabel(item)}] ${titleOf(item)}`,
+    card: item,
+    mode: 'queue'
+  });
+  if (!result.grade) return { messages: ['Review canceled.'] };
+  applyReviewGrade(item, result.grade);
+  recordActivity(db);
+  saveDb(db);
+  return { messages: [`${messagePrefix}Reviewed: ${result.grade}`] };
 }
 
 function enterRootQueue(db, rootId, contextId, { resume = false } = {}) {
@@ -1153,6 +1183,11 @@ async function run() {
 
     const selected = findInQueue(db, rootId, contextId, command);
     if (selected) {
+      if (selected.type === 'flashcard' && selected.cardType === 'image-occlusion') {
+        const review = await reviewImageOcclusionContext(db, selected);
+        printCommandContext(loadDb(), contextId, review.messages);
+        continue;
+      }
       contextId = selected.id;
       inRootQueue = false;
       printContextWithGap(db, contextId);

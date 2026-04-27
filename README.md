@@ -123,8 +123,10 @@ del image n // m // ...
 ```
 
 `del image` deletes attached images from the current item. Deleting an image also removes image-occlusion cards made from that image.
+When an image-occlusion flash card appears in queue, drill, or a normal list entry, Int opens the image review window masked. Press Space in that window to reveal, then press `1`-`4` to grade and close it. In drill, `1` is Fail and `2`-`4` are Pass.
 
 `del image`는 현재 항목에 첨부된 이미지를 삭제합니다. 이미지를 삭제하면 해당 이미지로 만든 이미지 오클루전 카드도 함께 삭제됩니다.
+이미지 오클루전 플래시카드가 queue, drill, 일반 list 진입에서 나타나면 마스킹된 이미지 리뷰 창이 자동으로 열립니다. 창에서 Space로 공개하고 `1`-`4`로 평가하면 창이 닫힙니다. drill에서는 `1`은 Fail, `2`-`4`는 Pass입니다.
 
 ## Edit Items / 항목 수정
 
@@ -230,9 +232,9 @@ Help is shown as pages sized to the current terminal height. Press Enter at `hel
 
 help는 현재 터미널 높이에 맞춘 페이지로 표시됩니다. `help>`에서 Enter를 누르면 다음 페이지로 이동하고, `q`를 누르면 닫고 이전 화면으로 돌아갑니다. 알 수 없는 명령 안내가 표시된 상태에서는 빈 Enter를 한 번 누르면 이전 화면 프레임으로 돌아갑니다.
 
-Lists show each item's type and child count.
+Lists show each item's type and child count. Branch, leaf, note, web/PDF, and flashcard items are grouped under separate headers.
 
-목록에는 항목 종류와 자식 항목 수가 표시됩니다.
+목록에는 항목 종류와 자식 항목 수가 표시됩니다. branch, leaf, note, web/PDF, flashcard 항목은 각각 별도 헤더 아래에 묶여 표시됩니다.
 
 ```text
 1. [branch] Chapter 1 (3)
