@@ -78,17 +78,18 @@ import pdf
 image on
 image off
 open image
+del image
 basic
 cloze
 ```
 
 `basic` creates a flash card with `Q?` and `A?`.
 `cloze` creates a masked flash card from the current note text.
-Branches, leaves, and notes can be created under any knowledge item. Flash cards can only be created under notes.
+Branches, leaves, and notes can be created under any knowledge item. Basic and cloze flash cards are created under notes. Image-occlusion flash cards are created from images attached to branches, leaves, or notes.
 
 `basic`은 `Q?`, `A?` 입력으로 플래시카드를 만듭니다.
 `cloze`는 현재 note 본문에서 특정 텍스트를 마스킹한 플래시카드를 만듭니다.
-branch, leaf, note는 어떤 지식 항목 아래에서도 만들 수 있습니다. flash card는 note 아래에서만 만들 수 있습니다.
+branch, leaf, note는 어떤 지식 항목 아래에서도 만들 수 있습니다. basic/cloze 플래시카드는 note 아래에서 만들고, 이미지 오클루전 플래시카드는 branch, leaf, note에 첨부된 이미지에서 생성합니다.
 
 Press `Esc` during follow-up prompts to cancel.
 
@@ -107,8 +108,23 @@ image off
 ```
 
 Attached images are not child list items. They belong to the current item and can be opened with `open image`.
+Inside the image window, use `Occlusion` to draw mask boxes and `Save` to create one image-occlusion flash card per mask.
+Attached images are shown in a separate `Images` list on the item screen.
 
 첨부 이미지는 하위 list 항목이 아닙니다. 현재 항목에 속하며 `open image`로 별도 창에서 볼 수 있습니다.
+이미지 창에서 `Occlusion`을 눌러 마스크 박스를 그리고 `Save`하면 마스크 1개당 이미지 오클루전 플래시카드 1개가 생성됩니다.
+첨부 이미지는 항목 화면의 별도 `Images` 목록으로 표시됩니다.
+
+```text
+del image
+del image n
+del image n:m
+del image n // m // ...
+```
+
+`del image` deletes attached images from the current item. Deleting an image also removes image-occlusion cards made from that image.
+
+`del image`는 현재 항목에 첨부된 이미지를 삭제합니다. 이미지를 삭제하면 해당 이미지로 만든 이미지 오클루전 카드도 함께 삭제됩니다.
 
 ## Edit Items / 항목 수정
 
@@ -286,10 +302,10 @@ drill 진행 중 새로 추가된 카드는 현재 drill이 all clear된 뒤 다
 
 ## Delete / 삭제
 
-Deleting an item also deletes its children.
+Deleting an item also deletes its children and attached image files.
 The same `del` commands work on the home root list, where they delete roots and all of their items.
 
-부모 항목을 삭제하면 자식 항목도 함께 삭제됩니다.
+부모 항목을 삭제하면 자식 항목과 첨부 이미지 파일도 함께 삭제됩니다.
 홈 화면의 root 목록에서도 같은 `del` 명령을 사용할 수 있으며, root와 모든 하위 항목이 함께 삭제됩니다.
 
 ```text

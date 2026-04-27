@@ -4,6 +4,7 @@ export function titleOf(item) {
   if (!item) return '';
   if (item.type === 'flashcard') {
     if (item.cardType === 'basic') return item.question;
+    if (item.cardType === 'image-occlusion') return item.prompt ?? 'Image occlusion';
     return item.maskedText;
   }
   if (item.type === 'web') return item.title ?? item.sourceUrl;
@@ -180,6 +181,25 @@ export function makeClozeCard(context, clozeText, maskedText, fsrsCard) {
     parentId: context.id,
     rootId: context.rootId,
     createdAt: nowIso(),
+    excluded: false,
+    fsrsCard
+  };
+  card.due = card.fsrsCard.due;
+  return card;
+}
+
+export function makeImageOcclusionCard(context, image, occlusion, fsrsCard, index = 1) {
+  const card = {
+    id: id('card'),
+    type: 'flashcard',
+    cardType: 'image-occlusion',
+    prompt: `Image occlusion ${index}`,
+    imageId: image.id,
+    imagePath: image.path,
+    occlusion,
+    parentId: context.id,
+    rootId: context.rootId,
+    createdAt: nowIso(index - 1),
     excluded: false,
     fsrsCard
   };

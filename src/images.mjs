@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { createReadStream, existsSync, mkdirSync, rmSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { spawn } from 'node:child_process';
 import { DATA_DIR } from './config.mjs';
 import { id, nowIso } from './time.mjs';
@@ -113,4 +113,34 @@ export async function attachClipboardImageToItem(db, item, { capture = captureCl
 
 export function imagesOf(item) {
   return Array.isArray(item?.images) ? item.images.filter((image) => image?.path) : [];
+}
+
+export function imageDisplayName(image) {
+  return image?.title || (image?.path ? basename(image.path) : image?.id) || 'image';
+}
+
+export function deleteImageFiles(images) {
+  for (const image of imagesOf({ images })) {
+    rmSync(image.path, { force: true });
+  }
+}
+
+export function deleteImagesFromItem(item, indices = null) {
+  const images = imagesOf(item);
+  if (images.length === 0) return { deleted: [], remaining: [] };
+
+  const selected = indices === null
+    ? new Set(images.map((_, index) => index + 1))
+    : new Set(indices);
+  const deleted = [];
+  const remaining = [];
+
+  images.forEach((image, index) => {
+    if (selected.has(index + 1)) deleted.push(image);
+    else remaining.push(image);
+  });
+
+  item.images = remaining;
+  deleteImageFiles(deleted);
+  return { deleted, remaining };
 }

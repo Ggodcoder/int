@@ -9,6 +9,7 @@ import {
   itemById,
   makeBasicCard,
   makeClozeCard,
+  makeImageOcclusionCard,
   makeItems,
   makePdfImport,
   makeRoots,
@@ -16,6 +17,7 @@ import {
   maskText,
   pdfDisplayName,
   sortedRoots,
+  subtreeIdsOf,
   titleOf,
   typeLabel,
   webDisplayName
@@ -42,7 +44,7 @@ import { createFrame } from './tui/renderer.mjs';
 import { screenSession } from './tui/session.mjs';
 import { applyEditedText, editableTextFor, editTitleFor, resolveEditTarget } from './edit.mjs';
 import { openEditWindow } from './editWindow.mjs';
-import { attachClipboardImageToItem, canAttachImage, imagesOf } from './images.mjs';
+import { attachClipboardImageToItem, canAttachImage, deleteImageFiles, deleteImagesFromItem, imagesOf } from './images.mjs';
 import { openImageWindow } from './imageWindow.mjs';
 
 const rl = input.isTTY
@@ -415,6 +417,34 @@ function removeDeletedIdsFromSessions(db, deletedIds) {
   }
 }
 
+function imagesForItems(items) {
+  return items.flatMap((item) => imagesOf(item));
+}
+
+function imagesForItemIds(db, itemIds) {
+  return imagesForItems(db.items.filter((item) => itemIds.has(item.id)));
+}
+
+function removeOcclusionCardsForImages(db, rootId, parentId, images) {
+  const imageIds = new Set(images.map((image) => image.id).filter(Boolean));
+  const imagePaths = new Set(images.map((image) => image.path).filter(Boolean));
+  const deletedIds = new Set();
+  db.items = db.items.filter((item) => {
+    const matches = item.rootId === rootId
+      && item.parentId === parentId
+      && item.type === 'flashcard'
+      && item.cardType === 'image-occlusion'
+      && (imageIds.has(item.imageId) || imagePaths.has(item.imagePath));
+    if (matches) deletedIds.add(item.id);
+    return !matches;
+  });
+  if (deletedIds.size > 0) {
+    removeDeletedIdsFromDrill(db, rootId, deletedIds);
+    removeDeletedIdsFromSessions(db, deletedIds);
+  }
+  return deletedIds;
+}
+
 function deleteFromQueue(db, rootId, contextId, spec) {
   const queue = listForContext(db, rootId, contextId);
   if (queue.length === 0) return { ok: false, messages: ['Queue is empty.'] };
@@ -425,7 +455,10 @@ function deleteFromQueue(db, rootId, contextId, spec) {
   }
 
   const selectedIds = indices.map((index) => queue[index - 1].id);
+  const subtreeIds = new Set(selectedIds.flatMap((itemId) => [...subtreeIdsOf(db, rootId, itemId)]));
+  const imageFiles = imagesForItemIds(db, subtreeIds);
   const deletedIds = deleteSubtrees(db, rootId, selectedIds);
+  deleteImageFiles(imageFiles);
   removeDeletedIdsFromDrill(db, rootId, deletedIds);
   removeDeletedIdsFromSessions(db, deletedIds);
   setCursor(db, rootId, contextId, 0, queueForContext(db, rootId, contextId).length);
@@ -448,9 +481,12 @@ function deleteFromRootList(db, spec) {
   }
 
   const rootIds = new Set(indices.map((index) => roots[index - 1].id));
-  const childCount = db.items.filter((item) => rootIds.has(item.rootId)).length;
+  const children = db.items.filter((item) => rootIds.has(item.rootId));
+  const childCount = children.length;
+  const imageFiles = imagesForItems(children);
   db.roots = db.roots.filter((root) => !rootIds.has(root.id));
   db.items = db.items.filter((item) => !rootIds.has(item.rootId));
+  deleteImageFiles(imageFiles);
 
   for (const rootId of rootIds) {
     delete db.app.sessions[rootId];
@@ -613,8 +649,71 @@ async function openImagesForContext(db, contextId) {
   if (!canAttachImage(item)) return { messages: ['Images can be opened on branch, leaf, and note items.'] };
   const images = imagesOf(item);
   if (images.length === 0) return { messages: ['No images attached.'] };
-  await openImageWindow({ title: `Images [${typeLabel(item)}] ${titleOf(item)}`, images });
+  await openImageWindow({
+    title: `Images [${typeLabel(item)}] ${titleOf(item)}`,
+    images,
+    async onOcclusions(occlusions) {
+      const latestDb = loadDb();
+      const latestItem = itemById(latestDb, contextId);
+      if (!canAttachImage(latestItem)) return { created: 0 };
+      const latestImages = imagesOf(latestItem);
+      const cards = [];
+      for (const occlusion of occlusions) {
+        const imageIndex = Number.parseInt(occlusion.imageIndex, 10);
+        const image = latestImages[imageIndex];
+        if (!image) continue;
+        const normalizedOcclusion = normalizeOcclusion(occlusion);
+        if (!normalizedOcclusion) continue;
+        cards.push(makeImageOcclusionCard(latestItem, image, normalizedOcclusion, makeFsrsCard(), cards.length + 1));
+      }
+      if (cards.length > 0) {
+        latestDb.items.push(...cards);
+        saveDb(latestDb);
+      }
+      return { created: cards.length };
+    }
+  });
   return { messages: [`Opened ${images.length} image${images.length === 1 ? '' : 's'}.`] };
+}
+
+function normalizeOcclusion(occlusion) {
+  const x = Number(occlusion.x);
+  const y = Number(occlusion.y);
+  const width = Number(occlusion.width);
+  const height = Number(occlusion.height);
+  if (![x, y, width, height].every(Number.isFinite)) return null;
+  if (width <= 0 || height <= 0) return null;
+  const clampedX = Math.max(0, Math.min(1, x));
+  const clampedY = Math.max(0, Math.min(1, y));
+  return {
+    x: clampedX,
+    y: clampedY,
+    width: Math.max(0.001, Math.min(1 - clampedX, width)),
+    height: Math.max(0.001, Math.min(1 - clampedY, height))
+  };
+}
+
+function deleteImagesFromContext(db, rootId, contextId, spec) {
+  const item = itemById(db, contextId);
+  if (!canAttachImage(item)) return { messages: ['Images can be deleted on branch, leaf, and note items.'] };
+  const images = imagesOf(item);
+  if (images.length === 0) return { messages: ['No images attached.'] };
+
+  const trimmed = spec.trim();
+  const parsed = trimmed ? parseDeleteSpec(trimmed, images.length) : { indices: images.map((_, index) => index + 1), invalid: [] };
+  if (parsed.indices.length === 0) {
+    return { messages: [parsed.invalid.length > 0 ? `Nothing deleted. Invalid image index: ${parsed.invalid.join(', ')}` : 'Nothing deleted.'] };
+  }
+
+  const { deleted } = deleteImagesFromItem(item, parsed.indices);
+  const deletedCardIds = removeOcclusionCardsForImages(db, rootId, contextId, deleted);
+  saveDb(db);
+
+  const imageText = deleted.length === 1 ? '1 image' : `${deleted.length} images`;
+  const cardText = deletedCardIds.size > 0 ? ` (${deletedCardIds.size} occlusion card${deletedCardIds.size === 1 ? '' : 's'} removed)` : '';
+  const messages = [`Deleted ${imageText}${cardText}.`];
+  if (parsed.invalid.length > 0) messages.push(`Skipped invalid image index: ${parsed.invalid.join(', ')}`);
+  return { messages };
 }
 
 function reviewSelected(db, rootId, contextId, passed) {
@@ -907,6 +1006,12 @@ async function run() {
     }
     if (normalized === 'open image') {
       const result = await openImagesForContext(db, contextId);
+      printCommandContext(loadDb(), contextId, result.messages);
+      continue;
+    }
+    if (normalized === 'del image' || normalized.startsWith('del image ')) {
+      const spec = command.slice('del image'.length).trim();
+      const result = deleteImagesFromContext(db, rootId, contextId, spec);
       printCommandContext(loadDb(), contextId, result.messages);
       continue;
     }

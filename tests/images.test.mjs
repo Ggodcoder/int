@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { attachClipboardImageToItem, canAttachImage, imagesOf } from '../src/images.mjs';
+import { attachClipboardImageToItem, canAttachImage, deleteImagesFromItem, imagesOf } from '../src/images.mjs';
 import { imageWindowInternals, openImageWindow } from '../src/imageWindow.mjs';
 
 function dbFixture() {
@@ -82,5 +82,59 @@ test('image window can render and launch attached images', async () => {
 
   assert.equal(result.opened, true);
   assert.match(launchedUrl, /^http:\/\/127\.0\.0\.1:/);
+  rmSync(tempDir, { recursive: true, force: true });
+});
+
+test('image window posts occlusion masks to the save callback', async () => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'int-image-occlusion-'));
+  const imagePath = join(tempDir, 'one.png');
+  writeFileSync(imagePath, Buffer.from('png'));
+
+  let launchedUrl = null;
+  let savedOcclusions = null;
+  const result = await openImageWindow({
+    title: 'Images',
+    images: [{ id: 'image-1', path: imagePath }],
+    async launcher(url) {
+      launchedUrl = url;
+      return { close: async () => {} };
+    },
+    async onOcclusions(occlusions) {
+      savedOcclusions = occlusions;
+      return { created: occlusions.length };
+    }
+  });
+
+  assert.equal(result.opened, true);
+  const response = await fetch(`${launchedUrl}occlusions`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ occlusions: [{ imageIndex: 0, x: 0.1, y: 0.2, width: 0.3, height: 0.4 }] })
+  });
+  assert.deepEqual(await response.json(), { ok: true, created: 1 });
+  assert.deepEqual(savedOcclusions, [{ imageIndex: 0, x: 0.1, y: 0.2, width: 0.3, height: 0.4 }]);
+  rmSync(tempDir, { recursive: true, force: true });
+});
+
+test('image deletion removes selected attached files from an item', () => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'int-delete-image-'));
+  const firstPath = join(tempDir, 'one.png');
+  const secondPath = join(tempDir, 'two.png');
+  writeFileSync(firstPath, Buffer.from('one'));
+  writeFileSync(secondPath, Buffer.from('two'));
+  const item = {
+    images: [
+      { id: 'image-1', path: firstPath },
+      { id: 'image-2', path: secondPath }
+    ]
+  };
+
+  const result = deleteImagesFromItem(item, [1]);
+
+  assert.equal(result.deleted.length, 1);
+  assert.equal(existsSync(firstPath), false);
+  assert.equal(existsSync(secondPath), true);
+  assert.deepEqual(item.images, [{ id: 'image-2', path: secondPath }]);
+  assert.equal(imagesOf(item).length, 1);
   rmSync(tempDir, { recursive: true, force: true });
 });

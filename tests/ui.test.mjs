@@ -51,6 +51,20 @@ function dbFixture() {
         createdAt: '2026-04-01T00:03:00.000Z',
         excluded: false,
         fsrsCard: { due: '2026-04-01T00:00:00.000Z' }
+      },
+      {
+        id: 'card-2',
+        type: 'flashcard',
+        cardType: 'image-occlusion',
+        prompt: 'Image occlusion 1',
+        imageId: 'image-1',
+        imagePath: 'one.png',
+        occlusion: { x: 0.1, y: 0.1, width: 0.2, height: 0.2 },
+        rootId: 'root-1',
+        parentId: 'branch-1',
+        createdAt: '2026-04-01T00:04:00.000Z',
+        excluded: false,
+        fsrsCard: { due: '2026-04-01T00:00:00.000Z' }
       }
     ]
   };
@@ -64,8 +78,8 @@ test('root and context renderers return line frames without printing', () => {
 
   const root = contextLines(db, 'root-1').join('\n');
   assert.match(root, /\[root\]/);
-  assert.match(root, /Branches 1 \(0\/1\) \| Notes 1 \(1\/1\) \| Flashcards 1/);
-  assert.match(root, /\[branch\] Branch \(1\)/);
+  assert.match(root, /Branches 1 \(0\/1\) \| Notes 1 \(1\/1\) \| Flashcards 2/);
+  assert.match(root, /\[branch\] Branch \(2\)/);
 });
 
 test('intro keeps the activity heatmap by stacking on narrow terminals', () => {
@@ -84,7 +98,8 @@ test('context renderer keeps done rows in list with muted done marker', () => {
 
   assert.match(branch, /\[note\] Done note \(1\) <done>/);
   assert.match(branch, /\x1b\[90m/);
-  assert.match(branch, /Images 1/);
+  assert.match(branch, /Images\n  1\. one\.png/);
+  assert.match(branch, /\[flash:image-occlusion\] Image occlusion 1 \/ .*revealed/);
 });
 
 test('queue progress shows remaining items from the current cursor', () => {

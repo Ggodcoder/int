@@ -6,6 +6,7 @@ import { ANSI, muted, visibleLength, yellow } from './tui/theme.mjs';
 import { centerAnsi, truncate } from './tui/layout.mjs';
 import { printLines } from './tui/renderer.mjs';
 import { screenSession } from './tui/session.mjs';
+import { imageDisplayName, imagesOf } from './images.mjs';
 
 const require = createRequire(import.meta.url);
 const { version: APP_VERSION } = require('../package.json');
@@ -53,6 +54,11 @@ export function flashcardLine(item, { revealed = true, baseColor = '' } = {}) {
   if (item.cardType === 'basic') {
     const answer = answerText(revealed ? item.answer : '[...]', baseColor);
     return withBaseColor(`${item.question} / ${answer}`, baseColor);
+  }
+
+  if (item.cardType === 'image-occlusion') {
+    const mask = answerText(revealed ? 'revealed' : '[...]', baseColor);
+    return withBaseColor(`${item.prompt ?? 'Image occlusion'} / ${mask}`, baseColor);
   }
 
   if (item.maskedText?.includes('{{c1::...}}')) {
@@ -109,6 +115,9 @@ Delete
   del n          delete one listed item
   del n:m        delete a range of listed items
   del n // m     delete several listed items (del n // m // ...)
+  del image      delete all images attached to the current item
+  del image n    delete one attached image
+  del image n:m  delete a range of attached images
   del on home    delete roots from the root list
 
 Sort
@@ -123,7 +132,7 @@ Navigation
   image on       enable clipboard image capture for branch/leaf/note
   image off      stop clipboard image capture
   blank Enter    attach clipboard image when image capture is on
-  open image     open attached images in a GUI window
+  open image     open attached images and create occlusion cards
   where          show the current context
   clear          clear screen and show the start view
   blank Enter    restore the previous frame after unknown command
@@ -290,7 +299,10 @@ export function contextLines(db, contextId) {
   const lines = [`[${typeLabel(context)}] ${multilinePathLabel(db, contextId, Infinity, true)}`];
   if (Array.isArray(context.images) && context.images.length > 0) {
     lines.push('');
-    lines.push(`Images ${context.images.length}`);
+    lines.push('Images');
+    imagesOf(context).forEach((image, index) => {
+      lines.push(`  ${index + 1}. ${imageDisplayName(image)}`);
+    });
   }
   if (context.type === 'root') {
     const stats = statsForRoot(db, context.id);
