@@ -3,7 +3,14 @@ import assert from 'node:assert/strict';
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { attachClipboardImageToItem, canAttachImage, deleteImagesFromItem, imagesOf } from '../src/images.mjs';
+import {
+  applyImageOrder,
+  attachClipboardImageToItem,
+  canAttachImage,
+  deleteImagesFromItem,
+  deleteSelectedImagesFromItem,
+  imagesOf
+} from '../src/images.mjs';
 import { imageWindowInternals, openImageOcclusionReviewWindow, openImageWindow } from '../src/imageWindow.mjs';
 
 function dbFixture() {
@@ -241,4 +248,40 @@ test('image deletion removes selected attached files from an item', () => {
   assert.deepEqual(item.images, [{ id: 'image-2', path: secondPath }]);
   assert.equal(imagesOf(item).length, 1);
   rmSync(tempDir, { recursive: true, force: true });
+});
+
+test('selected image deletion accepts field-selected image objects', () => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'int-delete-selected-image-'));
+  const firstPath = join(tempDir, 'one.png');
+  const secondPath = join(tempDir, 'two.png');
+  writeFileSync(firstPath, Buffer.from('one'));
+  writeFileSync(secondPath, Buffer.from('two'));
+  const item = {
+    images: [
+      { id: 'image-1', path: firstPath, sortOrder: 0 },
+      { id: 'image-2', path: secondPath, sortOrder: 1 }
+    ]
+  };
+
+  const result = deleteSelectedImagesFromItem(item, [{ id: 'image-1', path: firstPath }]);
+
+  assert.deepEqual(result.deleted.map((image) => image.id), ['image-1']);
+  assert.equal(existsSync(firstPath), false);
+  assert.equal(existsSync(secondPath), true);
+  assert.deepEqual(imagesOf(item).map((image) => image.id), ['image-2']);
+  rmSync(tempDir, { recursive: true, force: true });
+});
+
+test('image ordering is stored and read by sort order', () => {
+  const item = {
+    images: [
+      { id: 'image-1', path: 'one.png', createdAt: '2026-04-01T00:00:00.000Z' },
+      { id: 'image-2', path: 'two.png', createdAt: '2026-04-01T00:00:01.000Z' }
+    ]
+  };
+
+  applyImageOrder(item, [item.images[1], item.images[0]]);
+
+  assert.deepEqual(imagesOf(item).map((image) => image.id), ['image-2', 'image-1']);
+  assert.deepEqual(item.images.map((image) => image.sortOrder), [0, 1]);
 });

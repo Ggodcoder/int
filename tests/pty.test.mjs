@@ -103,7 +103,7 @@ test('real PTY frame prompt handles Korean backspace, long input, escape, and re
     app.write('\x1b');
     cursor = (await waitFor(app.output, /Created note: 한자[\s\S]*\[note\]\s+한자[\s\S]*int>/, 'Korean backspace note command frame', 8000, cursor)).end;
 
-    app.write('1\r');
+    app.write('n1\r');
     cursor = (await waitFor(app.output, /\[note\][\s\S]*한자[\s\S]*empty[\s\S]*int>/, 'enter note for flashcard', 8000, cursor)).end;
     await delay(200);
 
@@ -125,7 +125,7 @@ test('real PTY frame prompt handles Korean backspace, long input, escape, and re
     app.write('\x1b');
     cursor = (await waitFor(app.output, /\[branch\][\s\S]*long-input-long-input[\s\S]*int>/, 'long branch input in list', 8000, cursor)).end;
 
-    app.write('2\r');
+    app.write('b1\r');
     cursor = (await waitFor(app.output, /\[branch\][\s\S]*long-input-long-input[\s\S]*empty[\s\S]*int>/, 'enter long branch', 8000, cursor)).end;
 
     app.write('save link\r');
@@ -152,10 +152,10 @@ test('real PTY frame prompt handles Korean backspace, long input, escape, and re
     app.write('\r');
     cursor = (await waitFor(app.output, /\[branch\][\s\S]*long-input-long-input[\s\S]*\[web\] https:\/\/example\.com[\s\S]*int>/, 'blank enter restores previous frame after unknown command', 8000, cursor)).end;
 
-    app.write('sort 1 bottom\r');
+    app.write('sort w1 bottom\r');
     cursor = (await waitFor(app.output, /Sorted\.[\s\S]*\[web\] https:\/\/example\.com/, 'sort command frame', 8000, cursor)).end;
 
-    app.write('del 1\r');
+    app.write('del w1\r');
     cursor = (await waitFor(app.output, /Deleted 1 selected item\.[\s\S]*empty/, 'delete command frame', 8000, cursor)).end;
 
     app.write('root\r');

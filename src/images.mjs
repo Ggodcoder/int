@@ -112,7 +112,13 @@ export async function attachClipboardImageToItem(db, item, { capture = captureCl
 }
 
 export function imagesOf(item) {
-  return Array.isArray(item?.images) ? item.images.filter((image) => image?.path) : [];
+  return Array.isArray(item?.images)
+    ? item.images.filter((image) => image?.path).sort((a, b) => {
+        const orderA = Number.isFinite(a.sortOrder) ? a.sortOrder : Number.MAX_SAFE_INTEGER;
+        const orderB = Number.isFinite(b.sortOrder) ? b.sortOrder : Number.MAX_SAFE_INTEGER;
+        return orderA - orderB || String(a.createdAt ?? '').localeCompare(String(b.createdAt ?? ''));
+      })
+    : [];
 }
 
 export function imageDisplayName(image) {
@@ -143,4 +149,22 @@ export function deleteImagesFromItem(item, indices = null) {
   item.images = remaining;
   deleteImageFiles(deleted);
   return { deleted, remaining };
+}
+
+export function deleteSelectedImagesFromItem(item, selectedImages) {
+  const selectedIds = new Set(selectedImages.map((image) => image.id).filter(Boolean));
+  const selectedPaths = new Set(selectedImages.map((image) => image.path).filter(Boolean));
+  const images = imagesOf(item);
+  const deleted = images.filter((image) => selectedIds.has(image.id) || selectedPaths.has(image.path));
+  const remaining = images.filter((image) => !selectedIds.has(image.id) && !selectedPaths.has(image.path));
+  item.images = remaining;
+  deleteImageFiles(deleted);
+  return { deleted, remaining };
+}
+
+export function applyImageOrder(item, orderedImages) {
+  orderedImages.forEach((image, index) => {
+    image.sortOrder = index;
+  });
+  item.images = orderedImages;
 }

@@ -75,10 +75,8 @@ edit n
 import web
 save link
 import pdf
-image on
-image off
+new image     i, ㅑ
 open image
-del image
 basic
 cloze
 ```
@@ -97,35 +95,39 @@ Press `Esc` during follow-up prompts to cancel.
 
 ## Images / 이미지
 
-Use `image on` to attach clipboard images to the branch, leaf, or note you are currently viewing. On Windows and macOS, Int uses the OS clipboard path for captured images. Press blank Enter while `image on` is active to check and attach the current clipboard image. Use `image off` to stop capture.
+Use `new image`, `i`, or `ㅑ` to attach one clipboard image to the branch, leaf, or note you are currently viewing. Int waits at `image>`; capture or copy an image, then press Enter once to save it. On Windows and macOS, Int uses the OS clipboard path for captured images.
 
-`image on`을 사용하면 현재 보고 있는 branch, leaf, note에 클립보드 이미지를 첨부합니다. Windows와 macOS에서는 OS별 클립보드 경로를 사용합니다. `image on` 상태에서 빈 Enter를 누르면 현재 클립보드 이미지를 확인하여 첨부합니다. `image off`로 기능을 끕니다.
+`new image`, `i`, `ㅑ`를 사용하면 현재 보고 있는 branch, leaf, note에 클립보드 이미지를 1회 첨부합니다. Int가 `image>`에서 기다리면 이미지를 캡처하거나 복사한 뒤 Enter를 한 번 눌러 저장합니다. Windows와 macOS에서는 OS별 클립보드 경로를 사용합니다.
 
 ```text
-image on
+new image
+i
+ㅑ
 open image
-image off
+i1 / ㅑ1
 ```
 
-Attached images are not child list items. They belong to the current item and can be opened with `open image`.
+Attached images are not child list items. They belong to the current item and can be opened all at once with `open image`, or one by one with `i1`, `i2`, `ㅑ1`, and so on.
 Inside the image window, use `Occlusion` to draw mask boxes and `Save` to create one image-occlusion flash card per mask.
 Attached images are shown in a separate `Images` list on the item screen.
 
-첨부 이미지는 하위 list 항목이 아닙니다. 현재 항목에 속하며 `open image`로 별도 창에서 볼 수 있습니다.
+첨부 이미지는 하위 list 항목이 아닙니다. 현재 항목에 속하며 `open image`로 한 번에 열거나 `i1`, `i2`, `ㅑ1`처럼 하나씩 열 수 있습니다.
 이미지 창에서 `Occlusion`을 눌러 마스크 박스를 그리고 `Save`하면 마스크 1개당 이미지 오클루전 플래시카드 1개가 생성됩니다.
 첨부 이미지는 항목 화면의 별도 `Images` 목록으로 표시됩니다.
 
 ```text
-del image
-del image n
-del image n:m
-del image n // m // ...
+del i1
+del i1:3
+del i1 // i3
+sort i1 top
+sort i1 bottom
+sort i1 i2:i3
 ```
 
-`del image` deletes attached images from the current item. Deleting an image also removes image-occlusion cards made from that image.
+`del i1` deletes attached image 1 from the current item. Deleting an image also removes image-occlusion cards made from that image. `sort i1 ...` reorders the current item's image list and persists after restart.
 When an image-occlusion flash card appears in queue or drill, Int opens the image review window masked. Press Space in that window to reveal, then grade it. Queue uses `1`-`4` FSRS ratings. Drill uses `1` Fail and `2` Pass. Opening an image-occlusion card from a normal list shows only the masked image without review controls.
 
-`del image`는 현재 항목에 첨부된 이미지를 삭제합니다. 이미지를 삭제하면 해당 이미지로 만든 이미지 오클루전 카드도 함께 삭제됩니다.
+`del i1`은 현재 항목에 첨부된 1번 이미지를 삭제합니다. 이미지를 삭제하면 해당 이미지로 만든 이미지 오클루전 카드도 함께 삭제됩니다. `sort i1 ...`은 현재 항목의 이미지 목록 순서를 바꾸며 앱 재시작 후에도 유지됩니다.
 이미지 오클루전 플래시카드가 queue 또는 drill에서 나타나면 마스킹된 이미지 리뷰 창이 자동으로 열립니다. 창에서 Space로 공개한 뒤 평가합니다. queue는 `1`-`4` FSRS 평가를 사용하고, drill은 `1` Fail, `2` Pass를 사용합니다. 일반 list에서 이미지 오클루전 카드를 열면 리뷰 컨트롤 없이 마스킹된 이미지만 보여줍니다.
 
 ## Edit Items / 항목 수정
@@ -214,9 +216,18 @@ Imported PDFs are copied into the app data imports folder and can be opened with
 
 ## Navigate / 이동
 
-Type a listed number or exact item title to enter it.
+Child lists are numbered independently inside each field. Use a field prefix plus the number to enter a child item. Exact title entry still works.
 
-목록에 표시된 번호나 항목 이름을 입력하면 해당 항목으로 진입합니다.
+하위 목록은 각 필드 안에서 독립적으로 번호가 매겨집니다. 자식 항목에 진입할 때는 필드 접두어와 번호를 함께 입력합니다. 정확한 제목 입력도 계속 지원합니다.
+
+```text
+b1 / ㅠ1    enter branch 1
+l1 / ㅣ1    enter leaf 1
+n1 / ㅜ1    enter note 1
+f1 / ㄹ1    enter flashcard 1
+w1          enter web item 1
+p1          enter PDF item 1
+```
 
 ```text
 root / home    return to the current root
@@ -311,10 +322,16 @@ The same `del` commands work on the home root list, where they delete roots and 
 홈 화면의 root 목록에서도 같은 `del` 명령을 사용할 수 있으며, root와 모든 하위 항목이 함께 삭제됩니다.
 
 ```text
-del n
-del n:m
-del n // m // ...
+del b1
+del b1:3
+del b1 // n2 // f1
+del i1
+del i1:3
 ```
+
+Use the same field prefixes as navigation. Images use the `i` / `ㅑ` field prefix.
+
+진입과 같은 필드 접두어를 사용합니다. 이미지는 `i` / `ㅑ` 필드 접두어를 사용합니다.
 
 ## Sort / 순서 변경
 
@@ -325,14 +342,16 @@ list는 기본적으로 항목 종류와 상관없이 생성 오래된 순으로
 `sort`로 현재 list의 순서를 직접 바꿀 수 있으며, 변경된 순서는 앱 종료 후에도 유지됩니다.
 
 ```text
-sort n x:y
-sort n top
-sort n bottom
+sort b1 b2:b3
+sort b1 top
+sort b1 bottom
+sort i1 top
+sort i1 i2:i3
 ```
 
-`sort n x:y` moves item `n` between items `x` and `y`.
+`sort b1 b2:b3` moves branch `1` between branches `2` and `3`. `sort i1 i2:i3` does the same inside the image list. Sorting is field-local, so source and target must use the same field.
 
-`sort n x:y`는 `n`번 항목을 `x`번 항목과 `y`번 항목 사이로 이동합니다.
+`sort b1 b2:b3`는 branch `1`을 branch `2`와 `3` 사이로 이동합니다. `sort i1 i2:i3`는 이미지 목록 안에서 같은 방식으로 동작합니다. 정렬은 필드 내부에서만 동작하므로 source와 target은 같은 필드를 사용해야 합니다.
 
 ## Learning Day Time / 학습일 기준 시간
 

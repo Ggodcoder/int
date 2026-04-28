@@ -98,7 +98,8 @@ test('context renderer keeps done rows in list with muted done marker', () => {
 
   assert.match(branch, /Images\n  1\. one\.png/);
   assert.match(branch, /Notes\n.*\[note\] Done note \(1\) <done>/s);
-  assert.match(branch, /Flashcards\n.*\[flash:image-occlusion\] Image occlusion 1 \/ .*revealed/s);
+  assert.match(branch, /Notes\n.*1\..*\[note\] Done note/s);
+  assert.match(branch, /Flashcards\n\s+1\..*\[flash:image-occlusion\] Image occlusion 1 \/ .*revealed/s);
   assert.match(branch, /\[note\] Done note \(1\) <done>/);
   assert.match(branch, /\x1b\[90m/);
 });

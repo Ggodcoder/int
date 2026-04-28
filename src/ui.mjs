@@ -101,14 +101,14 @@ function groupedListLines(db, list) {
   const lines = [];
   for (const [section, label] of LIST_SECTIONS) {
     const entries = list
-      .map((item, index) => ({ item, index }))
+      .map((item) => ({ item }))
       .filter((entry) => listSectionFor(entry.item) === section);
     if (entries.length === 0) continue;
     if (lines.length > 0) lines.push('');
     lines.push(label);
-    for (const entry of entries) {
-      lines.push(listItemLine(db, entry.item, entry.index));
-    }
+    entries.forEach((entry, index) => {
+      lines.push(listItemLine(db, entry.item, index));
+    });
   }
   return lines;
 }
@@ -118,7 +118,13 @@ export function helpLines() {
 Commands
   new root       create root titles with type> title1 // title2
   set root       show roots, then choose by number or title
-  number/title   enter a listed root or child item
+  title          enter a listed item by exact title
+  b1 / ㅠ1       enter branch 1
+  l1 / ㅣ1       enter leaf 1
+  n1 / ㅜ1       enter note 1
+  f1 / ㄹ1       enter flashcard 1
+  i1 / ㅑ1       open image 1
+  w1 / p1       enter web item 1 / PDF item 1
 
 Create
   new branch     create branches under any knowledge item (b, ㅠ)
@@ -127,6 +133,7 @@ Create
                  type> repeats until empty Enter or Esc; // still creates many
   new note       create notes under any knowledge item (n, ㅜ)
                  type> repeats until empty Enter or Esc; // still creates many
+  new image      attach one clipboard image after image> Enter (i, ㅑ)
   edit           edit the current item in a Save/Cancel window
   edit n         edit listed item n in a Save/Cancel window
                  basic uses Q:/A:, cloze uses {{c1::text}}
@@ -151,26 +158,24 @@ Drill
                  image occlusion drill also uses 1 Fail / 2 Pass
 
 Delete
-  del n          delete one listed item
-  del n:m        delete a range of listed items
-  del n // m     delete several listed items (del n // m // ...)
-  del image      delete all images attached to the current item
-  del image n    delete one attached image
-  del image n:m  delete a range of attached images
+  del b1         delete branch 1
+  del b1:3       delete branches 1 through 3
+  del b1 // i1   delete several field-scoped entries
+  del i1         delete image 1
+  del i1:3       delete images 1 through 3
   del on home    delete roots from the root list
 
 Sort
-  sort n x:y     move item n between items x and y
-  sort n top     move item n to the top
-  sort n bottom  move item n to the bottom
+  sort b1 b2:b3  move branch 1 between branches 2 and 3
+  sort b1 top    move branch 1 to the top of Branches
+  sort b1 bottom move branch 1 to the bottom of Branches
+  sort i1 top    move image 1 to the top of Images
+  sort i1 i2:i3  move image 1 between images 2 and 3
 
 Navigation
   root / home    return to the current root
   back           move to the parent item
   open           open the current PDF/web item with the default app
-  image on       enable clipboard image capture for branch/leaf/note
-  image off      stop clipboard image capture
-  blank Enter    attach clipboard image when image capture is on
   open image     open attached images and create occlusion cards
   where          show the current context
   clear          clear screen and show the start view

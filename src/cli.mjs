@@ -40,11 +40,25 @@ import { normalizeWebUrl, renderWebPageToPdf } from './webImport.mjs';
 import { openWithDefaultApp, targetForOpenableItem } from './openTarget.mjs';
 import { selectPdfFile } from './fileDialog.mjs';
 import { copyPdfIntoLibrary } from './pdfImport.mjs';
+import {
+  fieldSelectorType,
+  itemsForField,
+  normalizeSortDestination,
+  parseFieldDeleteSpec,
+  parseFieldSelector
+} from './fieldSelectors.mjs';
 import { createFrame } from './tui/renderer.mjs';
 import { screenSession } from './tui/session.mjs';
 import { applyEditedText, editableTextFor, editTitleFor, resolveEditTarget } from './edit.mjs';
 import { openEditWindow } from './editWindow.mjs';
-import { attachClipboardImageToItem, canAttachImage, deleteImageFiles, deleteImagesFromItem, imagesOf } from './images.mjs';
+import {
+  applyImageOrder,
+  attachClipboardImageToItem,
+  canAttachImage,
+  deleteImageFiles,
+  deleteSelectedImagesFromItem,
+  imagesOf
+} from './images.mjs';
 import { openImageOcclusionReviewWindow, openImageWindow } from './imageWindow.mjs';
 
 const rl = input.isTTY
@@ -367,8 +381,12 @@ async function setLearningTime(db) {
 
 function findInQueue(db, rootId, contextId, token) {
   const queue = listForContext(db, rootId, contextId);
-  const asNumber = Number.parseInt(token, 10);
-  if (Number.isInteger(asNumber) && queue[asNumber - 1]) return queue[asNumber - 1];
+  const scoped = parseFieldSelector(token);
+  if (scoped) {
+    const scopedItems = queue.filter((item) => fieldSelectorType(item) === scoped.type);
+    const selected = scopedItems[scoped.index - 1];
+    if (selected) return selected;
+  }
   return queue.find((item) => titleOf(item).toLowerCase() === token.toLowerCase());
 }
 
@@ -425,6 +443,14 @@ function imagesForItemIds(db, itemIds) {
   return imagesForItems(db.items.filter((item) => itemIds.has(item.id)));
 }
 
+function imageEntriesForContext(item) {
+  return imagesOf(item).map((image) => ({
+    id: image.id ?? image.path,
+    type: 'image',
+    image
+  }));
+}
+
 function removeOcclusionCardsForImages(db, rootId, parentId, images) {
   const imageIds = new Set(images.map((image) => image.id).filter(Boolean));
   const imagePaths = new Set(images.map((image) => image.path).filter(Boolean));
@@ -447,27 +473,41 @@ function removeOcclusionCardsForImages(db, rootId, parentId, images) {
 
 function deleteFromQueue(db, rootId, contextId, spec) {
   const queue = listForContext(db, rootId, contextId);
-  if (queue.length === 0) return { ok: false, messages: ['Queue is empty.'] };
+  const context = itemById(db, contextId);
+  const combined = [...queue, ...imageEntriesForContext(context)];
+  if (combined.length === 0) return { ok: false, messages: ['List is empty.'] };
 
-  const { indices, invalid } = parseDeleteSpec(spec, queue.length);
-  if (indices.length === 0) {
-    return { ok: false, messages: [invalid.length > 0 ? `Nothing deleted. Invalid index: ${invalid.join(', ')}` : 'Nothing deleted.'] };
+  const { selected, invalid } = parseFieldDeleteSpec(spec, combined);
+  if (selected.length === 0) {
+    const hint = 'Use field selectors like b1, n1, l1, f1, or i1.';
+    return { ok: false, messages: [invalid.length > 0 ? `Nothing deleted. Invalid selector: ${invalid.join(', ')}. ${hint}` : `Nothing deleted. ${hint}`] };
   }
 
-  const selectedIds = indices.map((index) => queue[index - 1].id);
+  const selectedImages = selected.filter((item) => item.type === 'image').map((item) => item.image);
+  const selectedItems = selected.filter((item) => item.type !== 'image');
+  const selectedIds = selectedItems.map((item) => item.id);
   const subtreeIds = new Set(selectedIds.flatMap((itemId) => [...subtreeIdsOf(db, rootId, itemId)]));
   const imageFiles = imagesForItemIds(db, subtreeIds);
-  const deletedIds = deleteSubtrees(db, rootId, selectedIds);
+  const deletedIds = selectedIds.length > 0 ? deleteSubtrees(db, rootId, selectedIds) : new Set();
   deleteImageFiles(imageFiles);
+  let deletedImages = [];
+  let deletedImageCardIds = new Set();
+  if (selectedImages.length > 0) {
+    const result = deleteSelectedImagesFromItem(context, selectedImages);
+    deletedImages = result.deleted;
+    deletedImageCardIds = removeOcclusionCardsForImages(db, rootId, contextId, deletedImages);
+    for (const id of deletedImageCardIds) deletedIds.add(id);
+  }
   removeDeletedIdsFromDrill(db, rootId, deletedIds);
   removeDeletedIdsFromSessions(db, deletedIds);
   setCursor(db, rootId, contextId, 0, queueForContext(db, rootId, contextId).length);
   saveDb(db);
 
-  const selectedText = indices.length === 1 ? '1 selected item' : `${indices.length} selected items`;
-  const totalText = deletedIds.size === indices.length ? '' : ` (${deletedIds.size} total with children)`;
+  const selectedText = selected.length === 1 ? '1 selected entry' : `${selected.length} selected entries`;
+  const totalDeleted = deletedIds.size + deletedImages.length;
+  const totalText = totalDeleted === selected.length ? '' : ` (${totalDeleted} total with children/cards)`;
   const messages = [`Deleted ${selectedText}${totalText}.`];
-  if (invalid.length > 0) messages.push(`Skipped invalid index: ${invalid.join(', ')}`);
+  if (invalid.length > 0) messages.push(`Skipped invalid selector: ${invalid.join(', ')}`);
   return { ok: true, messages };
 }
 
@@ -504,9 +544,16 @@ function deleteFromRootList(db, spec) {
 }
 
 function parseSortSpec(command) {
-  const match = command.match(/^sort\s+(\d+)\s+(.+)$/i);
+  const match = command.match(/^sort\s+(\S+)\s+(.+)$/i);
   if (!match) return null;
-  return { source: Number.parseInt(match[1], 10), destination: match[2].trim().toLowerCase() };
+  const sourceToken = match[1].trim().toLowerCase();
+  const sourceNumber = Number.parseInt(sourceToken, 10);
+  return {
+    sourceToken,
+    source: Number.isInteger(sourceNumber) && String(sourceNumber) === sourceToken ? sourceNumber : null,
+    sourceSelector: parseFieldSelector(sourceToken),
+    destination: match[2].trim().toLowerCase()
+  };
 }
 
 function applyListOrder(list) {
@@ -522,7 +569,8 @@ function moveListItem(list, sourceIndex, destination) {
   }
 
   const moving = list[sourceIndex - 1];
-  const remaining = list.filter((item) => item.id !== moving.id);
+  const remaining = [...list];
+  remaining.splice(sourceIndex - 1, 1);
 
   if (destination === 'top') {
     applyListOrder([moving, ...remaining]);
@@ -552,8 +600,8 @@ function moveListItem(list, sourceIndex, destination) {
 
   const left = list[leftIndex - 1];
   const right = list[rightIndex - 1];
-  const leftRemainingIndex = remaining.findIndex((item) => item.id === left.id);
-  const rightRemainingIndex = remaining.findIndex((item) => item.id === right.id);
+  const leftRemainingIndex = remaining.indexOf(left);
+  const rightRemainingIndex = remaining.indexOf(right);
   if (leftRemainingIndex < 0 || rightRemainingIndex < 0) {
     return { ok: false, message: 'Invalid sort target.' };
   }
@@ -566,7 +614,7 @@ function moveListItem(list, sourceIndex, destination) {
 
 function sortRootList(db, command) {
   const spec = parseSortSpec(command);
-  if (!spec) return false;
+  if (!spec || spec.source === null) return false;
   const roots = sortedRoots(db);
   const result = moveListItem(roots, spec.source, spec.destination);
   if (!result.ok) {
@@ -580,7 +628,27 @@ function sortContextList(db, rootId, contextId, command) {
   const spec = parseSortSpec(command);
   if (!spec) return false;
   const list = listForContext(db, rootId, contextId);
-  const result = moveListItem(list, spec.source, spec.destination);
+  if (!spec.sourceSelector) {
+    return { handled: true, ok: false, messages: ['Use field selectors like sort b1 top, sort f1 bottom, or sort i1 top.'] };
+  }
+  if (spec.sourceSelector.type === 'image') {
+    const context = itemById(db, contextId);
+    if (!canAttachImage(context)) return { handled: true, ok: false, messages: ['Images can be sorted on branch, leaf, and note items.'] };
+    const images = imagesOf(context);
+    const destination = normalizeSortDestination(spec.destination, 'image');
+    if (!destination.ok) return { handled: true, ok: false, messages: [destination.message] };
+    const result = moveListItem(images, spec.sourceSelector.index, destination.destination);
+    if (!result.ok) return { handled: true, ok: false, messages: [result.message] };
+    applyImageOrder(context, images.sort((a, b) => a.sortOrder - b.sortOrder));
+    saveDb(db);
+    return { handled: true, ok: true, messages: ['Sorted.'] };
+  }
+  const scopedItems = itemsForField(list, spec.sourceSelector.type);
+  const destination = normalizeSortDestination(spec.destination, spec.sourceSelector.type);
+  if (!destination.ok) {
+    return { handled: true, ok: false, messages: [destination.message] };
+  }
+  const result = moveListItem(scopedItems, spec.sourceSelector.index, destination.destination);
   if (!result.ok) {
     return { handled: true, ok: false, messages: [result.message] };
   }
@@ -644,10 +712,22 @@ async function attachClipboardImageIfPossible(db, contextId) {
   return { attached: result.attached, messages: [result.message] };
 }
 
-async function openImagesForContext(db, contextId) {
+async function createImage(db, contextId) {
+  const item = itemById(db, contextId);
+  if (!canAttachImage(item)) return { messages: ['Images can be attached to branch, leaf, and note items.'] };
+  db.app.imageCaptureEnabled = false;
+  saveDb(db);
+  const value = await askCommand(rl, 'image> ');
+  if (value === null) return { messages: ['Canceled.'] };
+  const result = await attachClipboardImageIfPossible(db, contextId);
+  return { messages: result.messages };
+}
+
+async function openImagesForContext(db, contextId, selectedImages = null) {
   const item = itemById(db, contextId);
   if (!canAttachImage(item)) return { messages: ['Images can be opened on branch, leaf, and note items.'] };
-  const images = imagesOf(item);
+  const allImages = imagesOf(item);
+  const images = selectedImages ?? allImages;
   if (images.length === 0) return { messages: ['No images attached.'] };
   await openImageWindow({
     title: `Images [${typeLabel(item)}] ${titleOf(item)}`,
@@ -660,7 +740,8 @@ async function openImagesForContext(db, contextId) {
       const cards = [];
       for (const occlusion of occlusions) {
         const imageIndex = Number.parseInt(occlusion.imageIndex, 10);
-        const image = latestImages[imageIndex];
+        const displayed = images[imageIndex];
+        const image = latestImages.find((candidate) => (displayed?.id && candidate.id === displayed.id) || candidate.path === displayed?.path);
         if (!image) continue;
         const normalizedOcclusion = normalizeOcclusion(occlusion);
         if (!normalizedOcclusion) continue;
@@ -674,6 +755,14 @@ async function openImagesForContext(db, contextId) {
     }
   });
   return { messages: [`Opened ${images.length} image${images.length === 1 ? '' : 's'}.`] };
+}
+
+async function openImageSelectorForContext(db, contextId, selector) {
+  const item = itemById(db, contextId);
+  if (!canAttachImage(item)) return { messages: ['Images can be opened on branch, leaf, and note items.'] };
+  const image = imagesOf(item)[selector.index - 1];
+  if (!image) return { messages: [`Image ${selector.index} not found.`] };
+  return openImagesForContext(db, contextId, [image]);
 }
 
 function normalizeOcclusion(occlusion) {
@@ -691,29 +780,6 @@ function normalizeOcclusion(occlusion) {
     width: Math.max(0.001, Math.min(1 - clampedX, width)),
     height: Math.max(0.001, Math.min(1 - clampedY, height))
   };
-}
-
-function deleteImagesFromContext(db, rootId, contextId, spec) {
-  const item = itemById(db, contextId);
-  if (!canAttachImage(item)) return { messages: ['Images can be deleted on branch, leaf, and note items.'] };
-  const images = imagesOf(item);
-  if (images.length === 0) return { messages: ['No images attached.'] };
-
-  const trimmed = spec.trim();
-  const parsed = trimmed ? parseDeleteSpec(trimmed, images.length) : { indices: images.map((_, index) => index + 1), invalid: [] };
-  if (parsed.indices.length === 0) {
-    return { messages: [parsed.invalid.length > 0 ? `Nothing deleted. Invalid image index: ${parsed.invalid.join(', ')}` : 'Nothing deleted.'] };
-  }
-
-  const { deleted } = deleteImagesFromItem(item, parsed.indices);
-  const deletedCardIds = removeOcclusionCardsForImages(db, rootId, contextId, deleted);
-  saveDb(db);
-
-  const imageText = deleted.length === 1 ? '1 image' : `${deleted.length} images`;
-  const cardText = deletedCardIds.size > 0 ? ` (${deletedCardIds.size} occlusion card${deletedCardIds.size === 1 ? '' : 's'} removed)` : '';
-  const messages = [`Deleted ${imageText}${cardText}.`];
-  if (parsed.invalid.length > 0) messages.push(`Skipped invalid image index: ${parsed.invalid.join(', ')}`);
-  return { messages };
 }
 
 function reviewSelected(db, rootId, contextId, passed) {
@@ -945,27 +1011,6 @@ async function run() {
       continue;
     }
 
-    if (normalized === 'image on') {
-      db.app.imageCaptureEnabled = true;
-      saveDb(db);
-      const messages = ['Image capture on.'];
-      if (contextId) {
-        const attached = await attachClipboardImageIfPossible(db, contextId);
-        if (attached.attached) messages.push(...attached.messages);
-      }
-      if (contextId) printCommandContext(loadDb(), contextId, messages);
-      else printResult(messages.join('\n'));
-      continue;
-    }
-
-    if (normalized === 'image off') {
-      db.app.imageCaptureEnabled = false;
-      saveDb(db);
-      if (contextId) printCommandContext(loadDb(), contextId, ['Image capture off.']);
-      else printResult('Image capture off.');
-      continue;
-    }
-
     if (normalized === 'new root') {
       const result = await newRoot(db);
       if (result?.contextId) contextId = result.contextId;
@@ -1035,12 +1080,6 @@ async function run() {
       printCommandContext(loadDb(), contextId, result.messages);
       continue;
     }
-    if (normalized === 'del image' || normalized.startsWith('del image ')) {
-      const spec = command.slice('del image'.length).trim();
-      const result = deleteImagesFromContext(db, rootId, contextId, spec);
-      printCommandContext(loadDb(), contextId, result.messages);
-      continue;
-    }
     if (normalized === 'home' || normalized === 'root') {
       contextId = rootId;
       inRootQueue = false;
@@ -1075,6 +1114,11 @@ async function run() {
     if (normalized === 'new note' || normalized === 'n' || normalized === 'ㅜ') {
       const result = await createItem(db, contextId, 'note');
       contextId = result.contextId;
+      printCommandContext(loadDb(), contextId, result.messages);
+      continue;
+    }
+    if (normalized === 'new image' || normalized === 'i' || normalized === 'ㅑ') {
+      const result = await createImage(db, contextId);
       printCommandContext(loadDb(), contextId, result.messages);
       continue;
     }
@@ -1174,6 +1218,13 @@ async function run() {
     }
     if (normalized === 'drill') {
       await runDrill(rl, db, rootId);
+      continue;
+    }
+
+    const imageSelector = parseFieldSelector(command);
+    if (imageSelector?.type === 'image') {
+      const result = await openImageSelectorForContext(db, contextId, imageSelector);
+      printCommandContext(loadDb(), contextId, result.messages);
       continue;
     }
 
