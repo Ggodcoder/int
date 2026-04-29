@@ -23,7 +23,7 @@ import {
   webDisplayName
 } from './items.mjs';
 import { makeFsrsCard, applyReview, applyReviewGrade } from './review.mjs';
-import { cursorFor, listForContext, queueForContext, rootQueueFor, selectedQueueItem, sessionFor, setCursor } from './queue.mjs';
+import { cursorFor, dueFlashcardsInRoot, listForContext, queueForContext, rootQueueFor, selectedQueueItem, sessionFor, setCursor } from './queue.mjs';
 import {
   contextLines,
   flashcardLines,
@@ -71,6 +71,7 @@ const rl = input.isTTY
     }
   : createInterface({ input, output });
 const ROOT_QUEUE_CONTEXT = '__root_queue__';
+const ROOT_REVIEW_CONTEXT = '__root_review__';
 
 function printResult(message) {
   screenSession.renderResult(message);
@@ -866,6 +867,21 @@ function enterRootQueue(db, rootId, contextId, { resume = false } = {}) {
   return { contextId: queue[index].id, entered: true };
 }
 
+function enterReviewQueue(db, rootId, contextId, { resume = false } = {}) {
+  const queue = dueFlashcardsInRoot(db, rootId);
+  if (queue.length === 0) {
+    printResult('Review queue is empty.');
+    return { contextId, entered: false };
+  }
+  const session = sessionFor(db, rootId);
+  const shouldResume = resume || session.reviewQueueStarted === true;
+  const index = shouldResume ? cursorFor(db, rootId, ROOT_REVIEW_CONTEXT, queue.length) : 0;
+  session.reviewQueueStarted = true;
+  setCursor(db, rootId, ROOT_REVIEW_CONTEXT, index, queue.length);
+  saveDb(db);
+  return { contextId: queue[index].id, entered: true };
+}
+
 async function showRootQueueItem(db, rootId, contextId, messages = []) {
   const item = itemById(db, contextId);
   if (!item) return contextId;
@@ -901,6 +917,30 @@ async function showRootQueueItem(db, rootId, contextId, messages = []) {
   return showRootQueueItem(nextDb, rootId, nextItem.id, review.messages);
 }
 
+async function showReviewQueueItem(db, rootId, contextId, messages = []) {
+  const item = itemById(db, contextId);
+  if (!item) return contextId;
+  const queue = dueFlashcardsInRoot(db, rootId);
+  const currentIndex = Math.max(0, queue.findIndex((candidate) => candidate.id === contextId));
+  const review = await studyFlashcard(db, item, {
+    applySchedule: true,
+    progress: { current: currentIndex + 1, total: queue.length }
+  });
+  if (!review.grade) return contextId;
+  saveDb(db);
+
+  const nextDb = loadDb();
+  const nextQueue = dueFlashcardsInRoot(nextDb, rootId);
+  setCursor(nextDb, rootId, ROOT_REVIEW_CONTEXT, currentIndex, nextQueue.length);
+  saveDb(nextDb);
+  const nextItem = nextQueue[cursorFor(nextDb, rootId, ROOT_REVIEW_CONTEXT, nextQueue.length)];
+  if (!nextItem) {
+    printResult([...review.messages, 'Review queue is empty.'].join('\n'));
+    return rootId;
+  }
+  return showReviewQueueItem(nextDb, rootId, nextItem.id, review.messages);
+}
+
 function moveRootQueue(db, rootId, delta) {
   const queue = rootQueueFor(db, rootId);
   if (queue.length === 0) {
@@ -911,6 +951,18 @@ function moveRootQueue(db, rootId, delta) {
   setCursor(db, rootId, ROOT_QUEUE_CONTEXT, current + delta, queue.length);
   saveDb(db);
   return rootQueueFor(db, rootId)[cursorFor(db, rootId, ROOT_QUEUE_CONTEXT, queue.length)]?.id ?? null;
+}
+
+function moveReviewQueue(db, rootId, delta) {
+  const queue = dueFlashcardsInRoot(db, rootId);
+  if (queue.length === 0) {
+    printResult('Review queue is empty.');
+    return null;
+  }
+  const current = cursorFor(db, rootId, ROOT_REVIEW_CONTEXT, queue.length);
+  setCursor(db, rootId, ROOT_REVIEW_CONTEXT, current + delta, queue.length);
+  saveDb(db);
+  return dueFlashcardsInRoot(db, rootId)[cursorFor(db, rootId, ROOT_REVIEW_CONTEXT, queue.length)]?.id ?? null;
 }
 
 function excludeCurrentQueueItem(db, rootId, contextId) {
@@ -943,6 +995,7 @@ async function run() {
   let contextId = null;
   let needsPromptGap = false;
   let inRootQueue = false;
+  let inRootReview = false;
   let restoreFrameOnBlank = null;
 
   if (process.argv.includes('--smoke')) {
@@ -1001,6 +1054,7 @@ async function run() {
       db = loadDb();
       contextId = null;
       inRootQueue = false;
+      inRootReview = false;
       screenSession.render(createFrame(startViewLines(db), { kind: 'start' }));
       needsPromptGap = false;
       continue;
@@ -1015,6 +1069,7 @@ async function run() {
       const result = await newRoot(db);
       if (result?.contextId) contextId = result.contextId;
       inRootQueue = false;
+      inRootReview = false;
       if (contextId) printCommandContext(loadDb(), contextId, result?.messages ?? []);
       continue;
     }
@@ -1024,6 +1079,7 @@ async function run() {
       if (rootId) {
         contextId = rootId;
         inRootQueue = false;
+        inRootReview = false;
         printContextWithGap(db, contextId);
       }
       continue;
@@ -1054,6 +1110,7 @@ async function run() {
         saveDb(db);
         contextId = root.id;
         inRootQueue = false;
+        inRootReview = false;
         printContextWithGap(db, contextId);
         continue;
       }
@@ -1083,6 +1140,7 @@ async function run() {
     if (normalized === 'home' || normalized === 'root') {
       contextId = rootId;
       inRootQueue = false;
+      inRootReview = false;
       printContextWithGap(db, contextId);
       continue;
     }
@@ -1090,12 +1148,22 @@ async function run() {
       const result = enterRootQueue(db, rootId, contextId, { resume: inRootQueue });
       contextId = result.contextId;
       inRootQueue = result.entered;
+      inRootReview = false;
       if (result.entered) contextId = await showRootQueueItem(loadDb(), rootId, contextId);
+      continue;
+    }
+    if (normalized === 'review') {
+      const result = enterReviewQueue(db, rootId, contextId, { resume: inRootReview });
+      contextId = result.contextId;
+      inRootReview = result.entered;
+      inRootQueue = false;
+      if (result.entered) contextId = await showReviewQueueItem(loadDb(), rootId, contextId);
       continue;
     }
     if (normalized === 'back') {
       contextId = parentIdFor(db, contextId);
       inRootQueue = false;
+      inRootReview = false;
       printContextWithGap(db, contextId);
       continue;
     }
@@ -1157,6 +1225,12 @@ async function run() {
           contextId = nextId;
           contextId = await showRootQueueItem(loadDb(), rootId, contextId);
         }
+      } else if (inRootReview) {
+        const nextId = moveReviewQueue(db, rootId, 1);
+        if (nextId) {
+          contextId = nextId;
+          contextId = await showReviewQueueItem(loadDb(), rootId, contextId);
+        }
       } else {
         moveQueue(db, rootId, contextId, 1);
       }
@@ -1168,6 +1242,12 @@ async function run() {
         if (previousId) {
           contextId = previousId;
           contextId = await showRootQueueItem(loadDb(), rootId, contextId);
+        }
+      } else if (inRootReview) {
+        const previousId = moveReviewQueue(db, rootId, -1);
+        if (previousId) {
+          contextId = previousId;
+          contextId = await showReviewQueueItem(loadDb(), rootId, contextId);
         }
       } else {
         moveQueue(db, rootId, contextId, -1);
@@ -1183,6 +1263,8 @@ async function run() {
         } else {
           printResult(result.messages.join('\n'));
         }
+      } else if (inRootReview) {
+        printResult('Flash cards cannot be marked done. Review them instead.');
       } else {
         const result = excludeCurrentContextItem(db, contextId);
         printCommandContext(loadDb(), contextId, result.messages);
@@ -1212,7 +1294,7 @@ async function run() {
       }
     }
     if (normalized === 'pass' || normalized === 'fail') {
-      if (inRootQueue) reviewCurrent(db, contextId, normalized === 'pass');
+      if (inRootQueue || inRootReview) reviewCurrent(db, contextId, normalized === 'pass');
       else reviewSelected(db, rootId, contextId, normalized === 'pass');
       continue;
     }
@@ -1237,6 +1319,7 @@ async function run() {
       }
       contextId = selected.id;
       inRootQueue = false;
+      inRootReview = false;
       printContextWithGap(db, contextId);
       continue;
     }

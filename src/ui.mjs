@@ -144,13 +144,16 @@ Create
   cloze          create a cloze flash card from the current note body
 
 Queue
-  que            enter or resume the current root queue flow
+  que            enter or resume the current root reading queue flow
   ] / next       move to the next queue item
   [ / prev       move to the previous queue item (previous also works)
   d              mark the selected/current non-flashcard item done
   reset          restore the current done item to the queue
-  pass / fail    review the selected flash card outside que/drill
-  1-4            rate revealed flash cards in que
+  pass / fail    review the selected flash card outside review/drill
+
+Review
+  review         review due flash cards in the current root
+  1-4            rate revealed flash cards in review
 
 Drill
   drill          round drill all flash cards in the current root
