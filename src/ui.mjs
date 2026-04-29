@@ -359,6 +359,11 @@ export function contextLines(db, contextId) {
     );
   }
 
+  if (context.type === 'note' && context.body) {
+    lines.push('');
+    lines.push(...context.body.split('\n'));
+  }
+
   if (context.type === 'flashcard') {
     return lines;
   }
